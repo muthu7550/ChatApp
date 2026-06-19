@@ -1,0 +1,51 @@
+.call-wrapper {
+  height: 100vh;
+  background: #0b141a;
+  position: relative;
+}
+
+.call-loading {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.call-avatar {
+  width: 140px;
+  height: 140px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 5px solid #25d366;
+}
+
+.call-title {
+  margin-top: 20px;
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.call-subtitle {
+  color: #94a3b8;
+  margin-top: 8px;
+}
+
+.lk-room-container {
+  height: 100vh !important;
+  background: #000 !important;
+}
+
+.lk-video-conference {
+  height: 100vh !important;
+}
+
+.lk-participant-tile {
+  border-radius: 20px !important;
+  overflow: hidden;
+}
+
+.lk-control-bar {
+  background: rgba(20,20,20,.9) !important;
+}
