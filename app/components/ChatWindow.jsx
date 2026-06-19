@@ -112,28 +112,52 @@ export default function ChatWindow({
     }
   }
 
-  async function sendMessage(payload) {
+async function sendMessage(payload = {}) {
+  try {
+    if (!conversation?._id) {
+      alert("Select chat first");
+      return;
+    }
+
+    if (!currentUser?._id) {
+      alert("Login again");
+      return;
+    }
+
+    const messagePayload = {
+      conversationId: conversation._id,
+      senderId: currentUser._id,
+      text: payload?.text || "",
+      attachments: payload?.attachments || [],
+      location: payload?.location || null,
+    };
+
+    console.log("SEND MESSAGE PAYLOAD:", messagePayload);
+
     const res = await fetch("/api/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        conversationId: conversation?._id,
-        senderId: currentUser?._id,
-        text: payload?.text || "",
-        attachments: payload?.attachments || [],
-        location: payload?.location || null,
-      }),
+      body: JSON.stringify(messagePayload),
     });
 
-    const result = await res.json();
+    const result = await res.json().catch(() => null);
 
-    if (result?.success) {
-      setMessages((prev) => [...prev, result?.message]);
-      onRefreshConversations?.();
+    console.log("SEND MESSAGE RESULT:", result);
+
+    if (!res.ok || !result?.success) {
+      alert(result?.error || "Message send failed");
+      return;
     }
+
+    setMessages((prev) => [...prev, result.message]);
+    onRefreshConversations?.();
+  } catch (error) {
+    console.error("Send message error:", error);
+    alert("Message send failed");
   }
+}
 
   async function startCall(type) {
     if (!conversation?._id) {
