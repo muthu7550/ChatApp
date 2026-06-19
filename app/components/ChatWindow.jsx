@@ -339,36 +339,8 @@ async function sendMessage(payload = {}) {
             <FaVideo />
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShowChatMenu((prev) => !prev)}
-            className="btn btn-sm btn-dark rounded-circle chat-icon-btn"
-            title="More"
-          >
-            <FaEllipsisV />
-          </button>
 
-          {showChatMenu && (
-            <div className="chat-menu shadow-lg">
-              <button
-                type="button"
-                onClick={clearChat}
-                className="chat-menu-item d-flex"
-              >
-                <FaBroom className="me-2" />
-                Clear Chat
-              </button>
 
-              <button
-                type="button"
-                onClick={deleteChat}
-                className="chat-menu-item text-danger d-flex"
-              >
-                <FaTrash className="me-2" />
-                Delete Chat
-              </button>
-            </div>
-          )}
         </div>
       </header>
      
