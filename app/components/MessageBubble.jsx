@@ -9,98 +9,93 @@ export default function MessageBubble({
 }) {
   const [showMenu, setShowMenu] = useState(false);
 
-  const senderName = isOwnMessage ? "You" : message?.sender?.name || "User";
+  const senderName = isOwnMessage
+    ? "You"
+    : message?.sender?.name || "User";
+
   const isDeleted = message?.deletedForEveryone;
-  
+
   return (
-    <div className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`d-flex ${
+        isOwnMessage ? "justify-content-end" : "justify-content-start"
+      }`}
+    >
       <div
-        className={`relative max-w-[75%] md:max-w-md rounded-2xl px-4 py-3 shadow ${
-          isOwnMessage
-            ? "bg-[#005c4b] text-white rounded-tr-sm"
-            : "bg-[#202c33] text-white rounded-tl-sm"
-        }`}
+        className={`position-relative px-3 py-2 rounded-4 shadow-sm`}
+        style={{
+          maxWidth: "75%",
+          background: isOwnMessage ? "#005c4b" : "#202c33",
+          color: "#fff",
+        }}
       >
-        {!isDeleted && (
+        {/* SHOW MENU ONLY FOR OWN MESSAGE */}
+        {isOwnMessage && !isDeleted && (
           <button
+            type="button"
             onClick={() => setShowMenu((prev) => !prev)}
-            className="absolute top-2 right-2 text-zinc-300 hover:text-white"
+            className="btn btn-sm text-white border-0 p-0 position-absolute"
+            style={{
+              top: 8,
+              right: 10,
+            }}
           >
             ⋮
           </button>
         )}
 
-       {showMenu && !isDeleted && (
-  <div
-    className="position-absolute top-100 end-0 mt-2 bg-dark border border-secondary rounded-4 shadow-lg overflow-hidden"
-    style={{
-      width: "230px",
-      zIndex: 9999,
-    }}
-  >
-    <button
-      type="button"
-      onClick={() => {
-        setShowMenu(false);
-        onDeleteMessage(message?._id, "me");
-      }}
-      className="btn w-100 text-start text-white border-0 rounded-0 px-3 py-2 d-flex align-items-start gap-3"
-    >
-      <span className="fs-6">🗑</span>
+        {/* MENU */}
+        {isOwnMessage && showMenu && !isDeleted && (
+          <div
+            className="position-absolute top-100 end-0 mt-2 bg-dark border border-secondary rounded-4 shadow-lg overflow-hidden"
+            style={{
+              width: "220px",
+              zIndex: 9999,
+            }}
+          >
 
-      <span>
-        <span className="d-block fw-semibold small">
-          Delete for me
-        </span>
-      </span>
-    </button>
+            <hr className="m-0 border-secondary" />
 
-    {isOwnMessage && (
-      <>
-        <div className="border-secondary opacity-50" />
+            <button
+              type="button"
+              onClick={() => {
+                setShowMenu(false);
+                onDeleteMessage(message?._id, "everyone");
+              }}
+              className="btn btn-dark w-100 text-start border-0 rounded-0 px-3 py-3 text-danger"
+            >
+              <div className="fw-semibold">
+                ❌ Delete for everyone
+              </div>
+            </button>
+          </div>
+        )}
 
-        <button
-          type="button"
-          onClick={() => {
-            setShowMenu(false);
-            onDeleteMessage(message?._id, "everyone");
-          }}
-          className="btn w-100 text-start border-0 rounded-0 px-3 py-2 d-flex align-items-start gap-3 text-danger"
-        >
-          <span className="fs-6">❌</span>
-
-          <span>
-            <span className="d-block fw-semibold small">
-              Delete for everyone
-            </span>
-          </span>
-        </button>
-      </>
-    )}
-  </div>
-)}
-
-        <p className="text-xs font-bold mb-1 text-emerald-300 pr-6">
+        {/* SENDER */}
+        <div className="fw-bold small text-success mb-1 pe-4">
           {senderName}
-        </p>
+        </div>
 
+        {/* DELETED MESSAGE */}
         {isDeleted ? (
-          <p className="italic text-zinc-300">
-             This message was deleted
-          </p>
+          <div className="fst-italic text-light opacity-75">
+            This message was deleted
+          </div>
         ) : (
           <>
             {message?.text && (
-              <p className="whitespace-pre-wrap pr-5">{message?.text}</p>
+              <div className="pe-4">
+                {message?.text}
+              </div>
             )}
 
             {message?.attachments?.map((file, index) => (
-              <div key={index} className="mt-3">
+              <div key={index} className="mt-2">
                 {file?.type === "image" && (
                   <img
                     src={file?.url}
-                    alt={file?.name}
-                    className="rounded-xl"
+                    alt=""
+                    className="img-fluid rounded"
                   />
                 )}
 
@@ -108,19 +103,24 @@ export default function MessageBubble({
                   <video
                     src={file?.url}
                     controls
-                    className="rounded-xl w-full"
+                    className="w-100 rounded"
                   />
                 )}
 
                 {file?.type === "audio" && (
-                  <audio src={file?.url} controls className="w-full" />
+                  <audio
+                    src={file?.url}
+                    controls
+                    className="w-100"
+                  />
                 )}
 
                 {["pdf", "doc", "file"].includes(file?.type) && (
                   <a
                     href={file?.url}
                     target="_blank"
-                    className="flex items-center gap-2 bg-black/20 p-3 rounded-xl"
+                    rel="noreferrer"
+                    className="d-block text-white text-decoration-none"
                   >
                     📄 {file?.name}
                   </a>
@@ -132,7 +132,8 @@ export default function MessageBubble({
               <a
                 href={message?.location?.mapUrl}
                 target="_blank"
-                className="block mt-2 underline font-bold text-emerald-300"
+                rel="noreferrer"
+                className="d-block mt-2 text-success fw-bold"
               >
                 📍 Open Location
               </a>
@@ -140,15 +141,22 @@ export default function MessageBubble({
           </>
         )}
 
-        <p className="text-[10px] text-right text-zinc-300 mt-1 m-0">
+        <div
+          className="text-end mt-1"
+          style={{
+            fontSize: "10px",
+            color: "#ddd",
+          }}
+        >
           {message?.createdAt
-            ? new Date(message?.createdAt).toLocaleTimeString([], {
+            ? new Date(message.createdAt).toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
               })
-            : ""}{" "}
-          {isOwnMessage && !isDeleted ? "✓✓" : ""}
-        </p>
+            : ""}
+
+          {isOwnMessage && !isDeleted && " ✓✓"}
+        </div>
       </div>
     </div>
   );
