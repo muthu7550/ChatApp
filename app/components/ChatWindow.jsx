@@ -161,7 +161,7 @@ export default function ChatWindow({
     const result = await res.json().catch(() => null);
 
     if (!res.ok || !result?.success) {
-      alert(result?.error || "Call create failed");
+      alert(result?.error || "Call create failed.");
       return;
     }
 
@@ -347,7 +347,7 @@ export default function ChatWindow({
           )}
         </div>
       </header>
-
+     
       <section className="chat-body flex-grow-1 min-h-0 overflow-auto">
         {messagesLoading ? (
           <MessageSkeleton />
