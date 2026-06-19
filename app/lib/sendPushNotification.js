@@ -36,27 +36,51 @@ export async function sendPushToUsers({
     const app = getFirebaseAdminApp();
     const messaging = getMessaging(app);
 
-    const response = await messaging.sendEachForMulticast({
-      tokens,
-      notification: {
-        title,
-        body,
-      },
-      webpush: {
-        notification: {
-          icon,
-          badge: "/default-avatar.png",
-        },
-        fcmOptions: {
-          link: url,
-        },
-      },
-    });
+const response = await messaging.sendEachForMulticast({
+  tokens,
+  notification: {
+    title,
+    body,
+  },
+  webpush: {
+    notification: {
+      icon,
+      badge: "/default-avatar.png",
+    },
+    fcmOptions: {
+      link: url,
+    },
+  },
+});
 
-    console.log("PUSH RESPONSE:", response);
-    console.log("SUCCESS:", response.successCount);
-    console.log("FAILED:", response.failureCount);
-    console.log("DETAILS:", response.responses);
+const invalidTokens = [];
+
+response.responses.forEach((item, index) => {
+  if (
+    !item.success &&
+    item.error?.code === "messaging/registration-token-not-registered"
+  ) {
+    invalidTokens.push(tokens[index]);
+  }
+});
+
+if (invalidTokens.length) {
+  await User.updateMany(
+    { fcmTokens: { $in: invalidTokens } },
+    {
+      $pull: {
+        fcmTokens: {
+          $in: invalidTokens,
+        },
+      },
+    }
+  );
+
+  console.log("Removed invalid tokens:", invalidTokens.length);
+}
+
+console.log("SUCCESS:", response.successCount);
+console.log("FAILED:", response.failureCount);
 
     return response;
   } catch (error) {

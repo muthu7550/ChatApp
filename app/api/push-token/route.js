@@ -20,11 +20,11 @@ export async function POST(req) {
     const updatedUser = await User.findByIdAndUpdate(
       body.userId,
       {
-        $addToSet: {
-          fcmTokens: body.token,
+        $set: {
+          fcmTokens: [body.token],
         },
       },
-      { new: true }
+      { returnDocument: "after" }
     ).select("name email fcmTokens");
 
     console.log("UPDATED USER FCM:", updatedUser);
