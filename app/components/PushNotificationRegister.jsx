@@ -4,13 +4,15 @@ import { useEffect } from "react";
 import { getFcmToken } from "../lib/firebaseClient";
 
 export default function PushNotificationRegister({ currentUser }) {
+    alert('ll')
   useEffect(() => {
     async function registerPush() {
       if (!currentUser?._id) return;
-      if (typeof window === "undefined") return;
-      if (!("Notification" in window)) return;
 
       const token = await getFcmToken();
+
+      console.log("FCM TOKEN:", token);
+      alert(token ? "FCM Token Generated" : "FCM Token Failed");
 
       if (!token) return;
 
