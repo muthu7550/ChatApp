@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { dbConnect } from "../../lib/db";
 import Call from "../../models/Call";
 import Conversation from "../../models/Conversation";
+import User from "../../models/User";
+import { sendPushToUsers } from "../../lib/sendPushNotification";
 
 export async function POST(req) {
   try {
@@ -30,6 +32,22 @@ export async function POST(req) {
       "caller",
       "name avatar"
     );
+
+    const conversation = await Conversation.findById(body?.conversationId);
+
+const receiverIds = conversation?.members
+  ?.map((id) => id.toString())
+  ?.filter((id) => id !== body?.callerId);
+
+const caller = await User.findById(body?.callerId).select("name avatar");
+
+await sendPushToUsers({
+  userIds: receiverIds,
+  title: `Incoming ${body?.type} call`,
+  body: `${caller?.name || "Someone"} is calling you`,
+  icon: caller?.avatar || "/default-avatar.png",
+  url: "/chat",
+});
 
     return NextResponse.json({
       success: true,

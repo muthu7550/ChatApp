@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { dbConnect } from "../../lib/db";
 import Message from "../../models/Message";
 import Conversation from "../../models/Conversation";
+import User from "../../models/User";
+import { sendPushToUsers } from "../../lib/sendPushNotification";
 
 export async function GET(req) {
   try {
@@ -53,6 +55,22 @@ export async function POST(req) {
       "sender",
       "name avatar"
     );
+
+    const conversation = await Conversation.findById(body?.conversationId);
+
+const receiverIds = conversation?.members
+  ?.map((id) => id.toString())
+  ?.filter((id) => id !== body?.senderId);
+
+const sender = await User.findById(body?.senderId).select("name avatar");
+
+await sendPushToUsers({
+  userIds: receiverIds,
+  title: sender?.name || "New message",
+  body: body?.text || "Sent an attachment",
+  icon: sender?.avatar || "/default-avatar.png",
+  url: `/chat?conversationId=${body?.conversationId}`,
+});
 
     return NextResponse.json({
       success: true,

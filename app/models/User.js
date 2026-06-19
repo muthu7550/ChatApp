@@ -6,9 +6,18 @@ const UserSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true },
     password: { type: String, required: true },
     avatar: String,
-    about: { type: String, default: "Hey there! I am using ChatterBox Pro Max 😂" },
+    about: {
+      type: String,
+      default: "Hey there! I am using ChatterBox Pro Max 😂",
+    },
     isOnline: { type: Boolean, default: false },
     lastSeen: Date,
+
+    fcmTokens: [
+      {
+        type: String,
+      },
+    ],
   },
   { timestamps: true }
 );

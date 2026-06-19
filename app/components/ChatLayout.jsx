@@ -7,6 +7,7 @@ import ChatWindow from "./ChatWindow";
 import IncomingCallWatcher from "./IncomingCallWatcher";
 import { requestNotificationPermission } from "../lib/notifyClient";
 import IncomingMessageWatcher from "./IncomingMessageWatcher";
+import PushNotificationRegister from "./PushNotificationRegister";
 
 export default function ChatLayout() {
   const searchParams = useSearchParams();
@@ -59,6 +60,9 @@ return (
       currentUser={currentUser}
       onRefresh={() => setRefreshKey((prev) => prev + 1)}
     />
+    {currentUser?._id && (
+  <PushNotificationRegister currentUser={currentUser} />
+)}
       </>
       
     )}

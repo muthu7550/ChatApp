@@ -29,24 +29,35 @@ export function playNotifySound(type = "message") {
     if (!ringtoneAudio.paused) return;
 
     ringtoneAudio.currentTime = 0;
-    ringtoneAudio.play().catch(() => {});
+    ringtoneAudio.play().catch((error) => {
+      console.log("Call sound blocked:", error);
+    });
+
     return;
   }
 
   if (!messageAudio) {
     messageAudio = new Audio("/call.wav");
+    messageAudio.loop = false;
     messageAudio.volume = 0.5;
   }
 
   messageAudio.currentTime = 0;
-  messageAudio.play().catch(() => {});
+  messageAudio.play().catch((error) => {
+    console.log("Message sound blocked:", error);
+  });
 }
 
 export function stopNotifySound() {
-  if (!ringtoneAudio) return;
+  if (ringtoneAudio) {
+    ringtoneAudio.pause();
+    ringtoneAudio.currentTime = 0;
+  }
 
-  ringtoneAudio.pause();
-  ringtoneAudio.currentTime = 0;
+  if (messageAudio) {
+    messageAudio.pause();
+    messageAudio.currentTime = 0;
+  }
 }
 
 export function showBrowserNotification({
@@ -66,6 +77,7 @@ export function showBrowserNotification({
   });
 
   notification.onclick = () => {
+    notification.close();
     window.focus();
 
     if (typeof onClick === "function") {
@@ -74,7 +86,7 @@ export function showBrowserNotification({
     }
 
     if (url) {
-      window.location.assign(url);
+      window.location.href = url;
     }
   };
 }
