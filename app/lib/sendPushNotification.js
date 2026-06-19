@@ -1,7 +1,10 @@
-import admin from "./firebaseAdmin";
+import { getMessaging } from "firebase-admin/messaging";
+import { getFirebaseAdminApp } from "./firebaseAdmin";
 import User from "../models/User";
 
 export async function sendPushToUsers({ userIds, title, body, url, icon }) {
+  if (!userIds?.length) return;
+
   const users = await User.find({
     _id: { $in: userIds },
     fcmTokens: { $exists: true, $ne: [] },
@@ -11,20 +14,21 @@ export async function sendPushToUsers({ userIds, title, body, url, icon }) {
 
   if (!tokens.length) return;
 
-  await admin.messaging().sendEachForMulticast({
+  const app = getFirebaseAdminApp();
+  const messaging = getMessaging(app);
+
+  await messaging.sendEachForMulticast({
     tokens,
     notification: {
       title,
       body,
-      imageUrl: icon || undefined,
     },
     webpush: {
       notification: {
         icon: icon || "/default-avatar.png",
-        badge: "/default-avatar.png",
       },
       fcmOptions: {
-        link: url,
+        link: url || "/chat",
       },
     },
   });
