@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { getFcmToken } from "../lib/firebaseClient";
 
 export default function PushNotificationRegister({ currentUser }) {
-    alert('ll')
   useEffect(() => {
     async function registerPush() {
       if (!currentUser?._id) return;
