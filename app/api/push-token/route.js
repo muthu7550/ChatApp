@@ -8,6 +8,8 @@ export async function POST(req) {
 
     const body = await req.json();
 
+    console.log("SAVE FCM TOKEN BODY:", body);
+
     if (!body?.userId || !body?.token) {
       return NextResponse.json(
         { success: false, error: "userId and token required" },
@@ -15,14 +17,25 @@ export async function POST(req) {
       );
     }
 
-    await User.findByIdAndUpdate(body.userId, {
-      $addToSet: {
-        fcmTokens: body.token,
+    const updatedUser = await User.findByIdAndUpdate(
+      body.userId,
+      {
+        $addToSet: {
+          fcmTokens: body.token,
+        },
       },
-    });
+      { new: true }
+    ).select("name email fcmTokens");
 
-    return NextResponse.json({ success: true });
+    console.log("UPDATED USER FCM:", updatedUser);
+
+    return NextResponse.json({
+      success: true,
+      user: updatedUser,
+    });
   } catch (error) {
+    console.error("SAVE FCM TOKEN ERROR:", error);
+
     return NextResponse.json(
       { success: false, error: error?.message },
       { status: 500 }

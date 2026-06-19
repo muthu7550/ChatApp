@@ -3,21 +3,30 @@ import { getFirebaseAdminApp } from "./firebaseAdmin";
 import User from "../models/User";
 
 export async function sendPushToUsers({ userIds, title, body, url, icon }) {
-  if (!userIds?.length) return;
+  console.log("PUSH userIds:", userIds);
+
+  if (!userIds?.length) {
+    console.log("PUSH stopped: no userIds");
+    return;
+  }
 
   const users = await User.find({
     _id: { $in: userIds },
     fcmTokens: { $exists: true, $ne: [] },
   }).select("fcmTokens");
 
+  console.log("PUSH users with tokens:", users.length);
+
   const tokens = users.flatMap((user) => user.fcmTokens || []);
+
+  console.log("PUSH token count:", tokens.length);
 
   if (!tokens.length) return;
 
   const app = getFirebaseAdminApp();
   const messaging = getMessaging(app);
 
-  await messaging.sendEachForMulticast({
+  const response = await messaging.sendEachForMulticast({
     tokens,
     notification: {
       title,
@@ -32,4 +41,6 @@ export async function sendPushToUsers({ userIds, title, body, url, icon }) {
       },
     },
   });
+
+  console.log("PUSH response:", response);
 }

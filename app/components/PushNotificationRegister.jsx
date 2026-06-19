@@ -11,7 +11,6 @@ export default function PushNotificationRegister({ currentUser }) {
       const token = await getFcmToken();
 
       console.log("FCM TOKEN:", token);
-      alert(token ? "FCM Token Generated" : "FCM Token Failed");
 
       if (!token) return;
 
