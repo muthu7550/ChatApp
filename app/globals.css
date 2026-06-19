@@ -305,3 +305,25 @@ body {
     padding: 26px 18px;
   }
 }
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: #0b141a;
+}
+
+body {
+  overscroll-behavior: none;
+}
+
+#__next {
+  height: 100%;
+}
+
+.chat-window-root {
+  height: 100svh;
+  max-height: 100svh;
+  min-height: 0;
+  overflow: hidden;
+}
