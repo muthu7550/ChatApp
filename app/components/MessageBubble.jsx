@@ -15,25 +15,26 @@ export default function MessageBubble({
   onPreviewImage,
 }) {
   const [showMenu, setShowMenu] = useState(false);
+
   const menuRef = useRef(null);
+  const longPressTimerRef = useRef(null);
 
   const senderName = isOwnMessage ? "You" : message?.sender?.name || "User";
   const isDeleted = message?.deletedForEveryone;
-  const longPressTimerRef = useRef(null);
 
-function handleLongPressStart() {
-  if (!isOwnMessage || isDeleted) return;
+  function handleLongPressStart() {
+    if (!isOwnMessage || isDeleted) return;
 
-  longPressTimerRef.current = setTimeout(() => {
-    setShowMenu(true);
-  }, 550);
-}
-
-function handleLongPressEnd() {
-  if (longPressTimerRef.current) {
-    clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      setShowMenu(true);
+    }, 550);
   }
-}
+
+  function handleLongPressEnd() {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+  }
 
   useEffect(() => {
     function handleOutsideClick(e) {
@@ -53,39 +54,51 @@ function handleLongPressEnd() {
 
   return (
     <div
-      className={`d-flex mb-2 px-2 ${isOwnMessage ? "justify-content-end" : "justify-content-start"}`}
+      className={`d-flex mb-2 px-2 ${
+        isOwnMessage ? "justify-content-end" : "justify-content-start"
+      }`}
     >
-<div
-  className="position-relative rounded-4 shadow-sm px-3 py-2 message-bubble-card"
-  onTouchStart={handleLongPressStart}
-  onTouchEnd={handleLongPressEnd}
-  onTouchCancel={handleLongPressEnd}
-  onMouseDown={handleLongPressStart}
-  onMouseUp={handleLongPressEnd}
-  onMouseLeave={handleLongPressEnd}
-  style={{
-    maxWidth: "min(78%, 520px)",
-    background: isOwnMessage ? "#005c4b" : "#202c33",
-    color: "#fff",
-    borderTopRightRadius: isOwnMessage ? "6px" : "18px",
-    borderTopLeftRadius: isOwnMessage ? "18px" : "6px",
-  }}
->
+      <div
+        className="position-relative rounded-4 shadow-sm px-3 py-2 message-bubble-card"
+        onTouchStart={handleLongPressStart}
+        onTouchEnd={handleLongPressEnd}
+        onTouchCancel={handleLongPressEnd}
+        onMouseDown={handleLongPressStart}
+        onMouseUp={handleLongPressEnd}
+        onMouseLeave={handleLongPressEnd}
+        style={{
+          maxWidth: "min(78%, 520px)",
+          background: isOwnMessage ? "#005c4b" : "#202c33",
+          color: "#fff",
+          borderTopRightRadius: isOwnMessage ? "6px" : "18px",
+          borderTopLeftRadius: isOwnMessage ? "18px" : "6px",
+        }}
+      >
         {isOwnMessage && !isDeleted && (
-          <div ref={menuRef}>
+          <div
+            ref={menuRef}
+            className="message-menu-wrap position-absolute top-0 end-0 mt-1 me-1"
+          >
             <button
               type="button"
-              onClick={() => setShowMenu((prev) => !prev)}
-              className="btn btn-sm text-white border-0 p-0 position-absolute opacity-75"
-              style={{ top: 8, right: 10 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu((prev) => !prev);
+              }}
+              className="btn btn-sm text-white border-0 rounded-circle d-flex align-items-center justify-content-center"
+              style={{
+                width: 28,
+                height: 28,
+                background: "rgba(0,0,0,0.12)",
+              }}
             >
               <FaEllipsisV size={12} />
             </button>
 
             {showMenu && (
               <div
-                className="position-absolute top-100 end-0 mt-2 bg-dark border border-secondary rounded-4 shadow-lg overflow-hidden"
-                style={{ width: 220, zIndex: 9999 }}
+                className="message-delete-popover"
+                onClick={(e) => e.stopPropagation()}
               >
                 <button
                   type="button"
@@ -93,17 +106,21 @@ function handleLongPressEnd() {
                     setShowMenu(false);
                     onDeleteMessage(message?._id, "everyone");
                   }}
-                  className="btn btn-dark w-100 text-start border-0 rounded-0 px-3 py-3 text-danger d-flex align-items-center gap-2"
+                  className="btn btn-dark w-100 text-start text-danger d-flex align-items-center gap-2 px-3 py-2 border-0"
                 >
-                  <FaTrashAlt />
-                  <span className="small fw-semibold">Delete for everyone</span>
+                  <FaTrashAlt size={14} />
+                  <span className="small fw-semibold">
+                    Delete for everyone
+                  </span>
                 </button>
               </div>
             )}
           </div>
         )}
 
-        <div className="fw-bold small text-success mb-1 pe-4">{senderName}</div>
+        <div className="fw-bold small text-success mb-1 pe-4">
+          {senderName}
+        </div>
 
         {isDeleted ? (
           <div className="fst-italic text-light opacity-75 small">
@@ -126,12 +143,12 @@ function handleLongPressEnd() {
                   <img
                     src={file?.url}
                     alt=""
-                    className="img-fluid rounded-4 cursor-pointer"
+                    className="img-fluid rounded-4"
                     style={{
                       maxHeight: "300px",
                       cursor: "pointer",
                     }}
-                    onClick={() => onPreviewImage(file?.url)}
+                    onClick={() => onPreviewImage?.(file?.url)}
                   />
                 )}
 

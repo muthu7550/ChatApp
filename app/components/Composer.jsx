@@ -11,7 +11,7 @@ import {
   FaTimes,
 } from "react-icons/fa";
 
-export default function Composer({ onSend, currentUser, onFocusInput  }) {
+export default function Composer({ onSend, currentUser }) {
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [pendingFile, setPendingFile] = useState(null);
@@ -231,7 +231,7 @@ function AttachItem({ icon, label, accept, onChange, disabled }) {
     <label className="btn btn-dark w-100 border-0 rounded-0 text-start px-4 py-3 d-flex align-items-center gap-3">
       <span className="text-success">{icon}</span>
       <span>{label}</span>
-      <input type="file" hidden disabled={disabled} onChange={onChange} accept={accept} onFocus={onFocusInput} />
+      <input type="file" hidden disabled={disabled} onChange={onChange} accept={accept} />
     </label>
   );
 }

@@ -4,13 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FaArrowLeft,
+  FaEllipsisV,
   FaPhoneAlt,
   FaVideo,
+  FaTrash,
+  FaBroom,
   FaCommentDots,
 } from "react-icons/fa";
 
 import Composer from "./Composer";
 import MessageBubble from "./MessageBubble";
+import { playNotifySound, showBrowserNotification } from "../lib/notifyClient";
 
 export default function ChatWindow({
   currentUser,
@@ -19,59 +23,33 @@ export default function ChatWindow({
   onBack,
 }) {
   const router = useRouter();
-  const bottomRef = useRef(null);
-  const chatBodyRef = useRef(null);
 
   const [messages, setMessages] = useState([]);
+  const [lastMessageId, setLastMessageId] = useState(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [showChatMenu, setShowChatMenu] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
+  const bottomRef = useRef(null);
 
   useEffect(() => {
     if (!conversation?._id || !currentUser?._id) return;
-    fetchMessages(true);
+    fetchMessages();
   }, [conversation?._id, currentUser?._id]);
 
-  useEffect(() => {
-    scrollToBottom(false);
-  }, [messages.length]);
-
-  useEffect(() => {
-    function handleResize() {
-      setTimeout(() => {
-        scrollToBottom(false);
-      }, 250);
-    }
-
-    window.visualViewport?.addEventListener("resize", handleResize);
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.visualViewport?.removeEventListener("resize", handleResize);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
-  function scrollToBottom(smooth = true) {
-    bottomRef.current?.scrollIntoView({
-      behavior: smooth ? "smooth" : "auto",
-      block: "end",
-    });
-  }
-
-  async function fetchMessages(shouldScroll = false) {
+  async function fetchMessages(shouldScroll = true) {
     try {
       setMessagesLoading(true);
 
       const res = await fetch(
-        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`
+        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
       );
 
       const result = await res.json();
       setMessages(result?.messages || []);
 
-      if (shouldScroll) {
-        setTimeout(() => scrollToBottom(false), 100);
-      }
+      setTimeout(() => {
+        if (shouldScroll) scrollToBottom(false);
+      }, 100);
     } catch (error) {
       console.error("Fetch messages error:", error);
     } finally {
@@ -83,20 +61,60 @@ export default function ChatWindow({
     const ok = confirm(
       type === "everyone"
         ? "Delete this message for everyone?"
-        : "Delete this message for me?"
+        : "Delete this message for me?",
     );
 
     if (!ok) return;
 
     const res = await fetch(
       `/api/messages/${messageId}?userId=${currentUser?._id}&type=${type}`,
-      { method: "DELETE" }
+      { method: "DELETE" },
     );
 
     const result = await res.json();
 
     if (result?.success) {
-      fetchMessages(true);
+      fetchMessages();
+    }
+  }
+
+  async function clearChat() {
+    const ok = confirm("Clear all messages in this chat?");
+    if (!ok) return;
+
+    const res = await fetch(
+      `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+      { method: "DELETE" },
+    );
+
+    const result = await res.json();
+
+    if (result?.success) {
+      setMessages([]);
+      setShowChatMenu(false);
+    }
+  }
+
+  async function deleteChat() {
+    const ok = confirm(
+      conversation?.type === "group"
+        ? "Leave/delete this group?"
+        : "Delete this chat?",
+    );
+
+    if (!ok) return;
+
+    const res = await fetch(
+      `/api/conversations?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+      { method: "DELETE" },
+    );
+
+    const result = await res.json();
+
+    if (result?.success) {
+      setShowChatMenu(false);
+      onRefreshConversations?.();
+      router.push("/chat");
     }
   }
 
@@ -120,6 +138,8 @@ export default function ChatWindow({
         location: payload?.location || null,
       };
 
+      console.log("SEND MESSAGE PAYLOAD:", messagePayload);
+
       const res = await fetch("/api/messages", {
         method: "POST",
         headers: {
@@ -130,6 +150,8 @@ export default function ChatWindow({
 
       const result = await res.json().catch(() => null);
 
+      console.log("SEND MESSAGE RESULT:", result);
+
       if (!res.ok || !result?.success) {
         alert(result?.error || "Message send failed");
         return;
@@ -138,11 +160,20 @@ export default function ChatWindow({
       setMessages((prev) => [...prev, result.message]);
       onRefreshConversations?.();
 
-      setTimeout(() => scrollToBottom(true), 80);
+      setTimeout(() => {
+        scrollToBottom(true);
+      }, 100);
     } catch (error) {
       console.error("Send message error:", error);
       alert("Message send failed");
     }
+  }
+
+  function scrollToBottom(smooth = true) {
+    bottomRef.current?.scrollIntoView({
+      behavior: smooth ? "smooth" : "auto",
+      block: "end",
+    });
   }
 
   async function startCall(type) {
@@ -176,7 +207,7 @@ export default function ChatWindow({
     }
 
     router.push(
-      `/call?room=${conversation?._id}&type=${type}&callId=${result?.call?._id}`
+      `/call?room=${conversation?._id}&type=${type}&callId=${result?.call?._id}`,
     );
   }
 
@@ -186,13 +217,17 @@ export default function ChatWindow({
       attachments: [],
       location: null,
     });
+
+    fetchMessages();
   }
 
   function getChatTitle() {
-    if (conversation?.type === "group") return conversation?.name || "Group";
+    if (conversation?.type === "group") {
+      return conversation?.name || "Group";
+    }
 
     const receiver = conversation?.members?.find(
-      (member) => member?._id !== currentUser?._id
+      (member) => member?._id !== currentUser?._id,
     );
 
     return receiver?.name || "User";
@@ -203,19 +238,19 @@ export default function ChatWindow({
       return (
         conversation?.avatar ||
         `https://ui-avatars.com/api/?name=${encodeURIComponent(
-          conversation?.name || "Group"
+          conversation?.name || "Group",
         )}&background=00a884&color=fff`
       );
     }
 
     const receiver = conversation?.members?.find(
-      (member) => member?._id !== currentUser?._id
+      (member) => member?._id !== currentUser?._id,
     );
 
     return (
       receiver?.avatar ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        receiver?.name || "User"
+        receiver?.name || "User",
       )}&background=00a884&color=fff`
     );
   }
@@ -224,20 +259,26 @@ export default function ChatWindow({
     if (!conversation?._id || !currentUser?._id) return;
 
     const interval = setInterval(async () => {
-      try {
-        const res = await fetch(
-          `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`
-        );
+      const res = await fetch(
+        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+      );
 
-        const result = await res.json();
-        setMessages(result?.messages || []);
-      } catch (error) {
-        console.error("Message polling error:", error);
+      const result = await res.json();
+      const latestMessage = result?.messages?.[result?.messages?.length - 1];
+
+      setMessages(result?.messages || []);
+
+      setTimeout(() => {
+        scrollToBottom(false);
+      }, 100);
+
+      if (latestMessage?._id) {
+        setLastMessageId(latestMessage?._id);
       }
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [conversation?._id, currentUser?._id]);
+  }, [conversation?._id, currentUser?._id, lastMessageId]);
 
   if (!conversation?._id) {
     return (
@@ -254,9 +295,9 @@ export default function ChatWindow({
   }
 
   return (
-<main className="chat-page-fixed">
-      <header className="chat-header-fixed">
-        <div className="d-flex align-items-center min-w-0 flex-grow-1">
+    <main className="chat-window-shell d-flex flex-column">
+      <header className="chat-header d-flex align-items-center justify-content-between px-2 px-sm-3">
+        <div className="d-flex align-items-center min-w-0">
           <button
             type="button"
             onClick={onBack}
@@ -285,7 +326,7 @@ export default function ChatWindow({
           </div>
         </div>
 
-        <div className="d-flex align-items-center gap-1 gap-sm-2 flex-shrink-0">
+        <div className="d-flex align-items-center gap-1 gap-sm-2 position-relative">
           <button
             type="button"
             onClick={() => startCall("audio")}
@@ -306,33 +347,60 @@ export default function ChatWindow({
         </div>
       </header>
 
-  <section className="chat-body-fixed">
-    <div className="chat-message-list">
-      {messages.map((message) => (
-        <MessageBubble
-          key={message?._id}
-          message={message}
-          isOwnMessage={message?.sender?._id === currentUser?._id}
-          onDeleteMessage={deleteMessage}
-          onPreviewImage={setPreviewImage}
-        />
-      ))}
-      <div ref={bottomRef} />
-    </div>
-  </section>
+      <section className="chat-body flex-grow-1 min-h-0 overflow-auto">
+        {messagesLoading ? (
+          <MessageSkeleton />
+        ) : messages?.length === 0 ? (
+          <EmptyChat onQuickMessage={sendQuickMessage} title={getChatTitle()} />
+        ) : (
+          <div className="chat-message-list">
+            {messages?.map((message) => (
+              <MessageBubble
+                key={message?._id}
+                message={message}
+                isOwnMessage={message?.sender?._id === currentUser?._id}
+                onDeleteMessage={deleteMessage}
+                MessageBubble={MessageBubble}
+                onPreviewImage={setPreviewImage}
+              />
+            ))}
+            <div ref={bottomRef} />
+          </div>
+        )}
+      </section>
 
-  <div className="chat-composer-fixed">
-    <Composer
-      onSend={sendMessage}
-      currentUser={currentUser}
-      onFocusInput={() => {
-        setTimeout(() => {
-          bottomRef.current?.scrollIntoView({ behavior: "auto" });
-        }, 300);
-      }}
-    />
-  </div>
-</main>
+      <div className="chat-composer-wrap">
+        <Composer onSend={sendMessage} currentUser={currentUser} />
+      </div>
+
+      {previewImage && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-100 d-flex align-items-center justify-content-center"
+          style={{
+            zIndex: 99999,
+          }}
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            className="btn btn-danger position-absolute top-0 end-0 m-3"
+            onClick={() => setPreviewImage(null)}
+          >
+            ✕
+          </button>
+
+          <img
+            src={previewImage}
+            alt="preview"
+            style={{
+              maxWidth: "95%",
+              maxHeight: "95%",
+              objectFit: "contain",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </main>
   );
 }
 
