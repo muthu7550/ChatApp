@@ -137,14 +137,6 @@ export default function CallClient() {
         <RoomAudioRenderer />
       </LiveKitRoom>
 
-      <button
-        type="button"
-        onClick={endCall}
-        className="mobile-call-end-btn"
-        disabled={ending}
-      >
-        {ending ? "Ending..." : "End Call"}
-      </button>
     </main>
   );
 }

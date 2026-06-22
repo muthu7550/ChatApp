@@ -170,14 +170,15 @@ body {
 
 }
 
- .chat-header {
-    flex: 0 0 62px;
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    background: #111b21;
-    border-bottom: 1px solid #2a3942;
-  }
+.chat-header {
+  position: sticky !important;
+  top: 0;
+  z-index: 999;
+  height: 70px;
+  background: #111b21;
+  border-bottom: 1px solid #222;
+  flex-shrink: 0;
+}
 
   .chat-body {
     flex: 1 1 auto;
