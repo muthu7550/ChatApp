@@ -163,21 +163,35 @@ body {
 }
 
 .chat-window-shell {
-  height: 100dvh;
-  min-height: 100vh;
-  width: 100%;
-  background: #0b141a;
-  color: #fff;
-  overflow: hidden;
+    height: 100svh;
+    max-height: 100svh;
+    overflow: hidden;
+    background: #0b141a;
+
 }
 
-.chat-header {
-  height: 64px;
-  min-height: 64px;
-  background: #202c33;
-  border-bottom: 1px solid #2a3942;
-  flex-shrink: 0;
-}
+ .chat-header {
+    flex: 0 0 62px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: #111b21;
+    border-bottom: 1px solid #2a3942;
+  }
+
+  .chat-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chat-composer-wrap {
+    flex: 0 0 auto;
+    background: #202c33;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 
 .chat-icon-btn {
   width: 38px;
@@ -213,12 +227,6 @@ body {
   background: #202c33;
 }
 
-.chat-body {
-  background: #0b141a;
-  background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
-  background-size: 18px 18px;
-}
-
 .chat-message-list {
   min-height: 100%;
   padding: 16px;
@@ -227,10 +235,6 @@ body {
   gap: 10px;
 }
 
-.chat-composer-wrap {
-  flex-shrink: 0;
-  border-top: 1px solid #2a3942;
-}
 
 .empty-chat-card {
   max-width: 420px;
