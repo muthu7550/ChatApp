@@ -7,8 +7,8 @@ import {
   VideoConference,
   RoomAudioRenderer,
 } from "@livekit/components-react";
-import "./call.css"
 import "@livekit/components-styles";
+import "./call.css";
 
 export default function CallClient() {
   const router = useRouter();
@@ -21,6 +21,7 @@ export default function CallClient() {
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
   const [user, setUser] = useState(null);
+  const [ending, setEnding] = useState(false);
 
   useEffect(() => {
     async function getToken() {
@@ -44,8 +45,8 @@ export default function CallClient() {
         },
         body: JSON.stringify({
           roomName: room,
-          userId: storedUser?._id,
-          name: storedUser?.name,
+          userId: storedUser._id,
+          name: storedUser.name,
         }),
       });
 
@@ -56,62 +57,72 @@ export default function CallClient() {
         return;
       }
 
-      setToken(result?.token);
+      setToken(result.token);
     }
 
     getToken();
   }, [room, router]);
 
   async function endCall() {
-    if (callId) {
-      await fetch("/api/calls", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          callId,
-          status: "ended",
-        }),
-      });
-    }
+    if (ending) return;
 
-    router.push("/chat");
+    try {
+      setEnding(true);
+
+      if (callId) {
+        await fetch("/api/calls", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            callId,
+            status: "ended",
+          }),
+        });
+      }
+    } finally {
+      router.replace("/chat");
+    }
   }
 
   if (error) {
     return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center">
-        <p>{error}</p>
+      <main className="call-loading-page">
+        <div className="call-error-card">
+          <h2>Call Error</h2>
+          <p>{error}</p>
+          <button onClick={() => router.replace("/chat")}>Back to Chat</button>
+        </div>
       </main>
     );
   }
 
   if (!token) {
     return (
-      <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
+      <main className="call-loading-page">
         <img
           src={
-            user?.avatar || 
+            user?.avatar ||
             `https://ui-avatars.com/api/?name=${encodeURIComponent(
               user?.name || "User"
             )}&background=00a884&color=fff`
           }
-          className="w-28 h-28 rounded-full object-cover border-4 border-emerald-500 animate-pulse"
+          className="call-loading-avatar"
           alt="call dp"
         />
 
-        <h1 className="text-3xl font-black mt-5">
+        <h1>
           {type === "video" ? "Starting Video Call..." : "Starting Audio Call..."}
         </h1>
 
-        <p className="text-zinc-400 mt-2">Connecting securely...</p>
+        <p>Connecting securely...</p>
       </main>
     );
   }
 
   return (
-    <main className="h-screen bg-black">
+    <main className="call-page">
       <LiveKitRoom
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
@@ -120,11 +131,20 @@ export default function CallClient() {
         audio={true}
         onDisconnected={endCall}
         data-lk-theme="default"
-        style={{ height: "100vh" }}
+        className="call-livekit-room"
       >
         <VideoConference />
         <RoomAudioRenderer />
       </LiveKitRoom>
+
+      <button
+        type="button"
+        onClick={endCall}
+        className="mobile-call-end-btn"
+        disabled={ending}
+      >
+        {ending ? "Ending..." : "End Call"}
+      </button>
     </main>
   );
 }
