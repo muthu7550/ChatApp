@@ -92,7 +92,7 @@ export default function CallClient() {
       <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
         <img
           src={
-            user?.avatar ||
+            user?.avatar || 
             `https://ui-avatars.com/api/?name=${encodeURIComponent(
               user?.name || "User"
             )}&background=00a884&color=fff`
