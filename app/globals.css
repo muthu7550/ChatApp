@@ -328,3 +328,52 @@ body {
   overflow: hidden;
 }
 
+.sidebar-skeleton-row {
+  border-bottom: 1px solid rgba(42, 57, 66, 0.45);
+}
+
+.sidebar-skeleton-avatar,
+.sidebar-skeleton-line,
+.sidebar-skeleton-dot {
+  background: linear-gradient(90deg, #202c33, #2a3942, #202c33);
+  background-size: 200% 100%;
+  animation: sidebarSkeleton 1.2s infinite linear;
+}
+
+.sidebar-skeleton-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.sidebar-skeleton-line {
+  height: 12px;
+  border-radius: 999px;
+}
+
+.sidebar-skeleton-line-title {
+  width: 65%;
+  margin-bottom: 10px;
+}
+
+.sidebar-skeleton-line-text {
+  width: 90%;
+}
+
+.sidebar-skeleton-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+@keyframes sidebarSkeleton {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}

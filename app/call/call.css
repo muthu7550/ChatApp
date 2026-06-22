@@ -1,13 +1,5 @@
-html,
-body {
-  height: 100%;
-  overflow: hidden;
-  background: #000;
-}
-
 .call-page {
-  height: 100svh;
-  max-height: 100svh;
+  height: 100vh;
   width: 100%;
   overflow: hidden;
   background: #000;
@@ -15,74 +7,12 @@ body {
 }
 
 .call-livekit-room {
-  height: 100svh !important;
-  max-height: 100svh !important;
-  overflow: hidden !important;
-  background: #000 !important;
-}
-
-.call-page [data-lk-theme="default"] {
-  height: 100svh !important;
-  max-height: 100svh !important;
-}
-
-.call-page .lk-video-conference {
-  height: 100svh !important;
-  max-height: 100svh !important;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
-}
-
-.call-page .lk-grid-layout-wrapper,
-.call-page .lk-focus-layout-wrapper {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  overflow: hidden !important;
-}
-
-.call-page .lk-control-bar {
-  position: fixed !important;
-  left: 50% !important;
-  bottom: calc(14px + env(safe-area-inset-bottom)) !important;
-  transform: translateX(-50%) !important;
-  z-index: 99999 !important;
-
-  width: auto !important;
-  max-width: calc(100vw - 20px) !important;
-  padding: 10px 12px !important;
-
-  background: rgba(10, 10, 10, 0.92) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 999px !important;
-  /* backdrop-filter: blur(14px) !important; */
-
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  flex-wrap: nowrap !important;
-}
-
-.call-page .lk-control-bar button {
-  width: 44px !important;
-  height: 44px !important;
-  min-width: 44px !important;
-  border-radius: 50% !important;
-}
-
-.call-page .lk-disconnect-button {
-  background: #ef4444 !important;
-  color: white !important;
-}
-
-.mobile-call-end-btn {
-  display: none;
+  height: 100vh;
+  background: #000;
 }
 
 .call-loading-page {
-  height: 100svh;
-  max-height: 100svh;
+  height: 100vh;
   background: #000;
   color: white;
   display: flex;
@@ -132,35 +62,86 @@ body {
 }
 
 @media (max-width: 576px) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .call-page {
+    height: 100svh;
+    max-height: 100svh;
+  }
+
+  .call-livekit-room {
+    height: 100svh !important;
+    max-height: 100svh !important;
+    overflow: hidden !important;
+    background: #000 !important;
+  }
+
+  .call-page [data-lk-theme="default"] {
+    height: 100svh !important;
+    max-height: 100svh !important;
+  }
+
+  .call-page .lk-video-conference {
+    height: 100svh !important;
+    max-height: 100svh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  .call-page .lk-grid-layout-wrapper,
+  .call-page .lk-focus-layout-wrapper {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
   .call-page .lk-control-bar {
+    position: fixed !important;
+    left: 50% !important;
     bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+    transform: translateX(-50%) !important;
+    z-index: 99999 !important;
+
+    width: auto !important;
     max-width: calc(100vw - 12px) !important;
     padding: 8px !important;
+
+    background: rgba(10, 10, 10, 0.92) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 999px !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     gap: 6px !important;
+    flex-wrap: nowrap !important;
   }
 
   .call-page .lk-control-bar button {
     width: 40px !important;
     height: 40px !important;
     min-width: 40px !important;
+    border-radius: 50% !important;
   }
 
   .call-page .lk-button-group {
     gap: 6px !important;
   }
 
-  .mobile-call-end-btn {
-    display: block;
-    position: fixed;
-    right: 14px;
-    top: calc(14px + env(safe-area-inset-top));
-    z-index: 100000;
-    border: 0;
-    border-radius: 999px;
-    padding: 9px 14px;
-    background: #ef4444;
-    color: #fff;
-    font-weight: 800;
+  .call-page .lk-disconnect-button {
+    background: #ef4444 !important;
+    color: white !important;
+  }
+
+  .call-loading-page {
+    height: 100svh;
+    max-height: 100svh;
   }
 }
 
