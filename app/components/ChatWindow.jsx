@@ -1,20 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FaArrowLeft,
-  FaEllipsisV,
   FaPhoneAlt,
   FaVideo,
-  FaTrash,
-  FaBroom,
   FaCommentDots,
 } from "react-icons/fa";
 
 import Composer from "./Composer";
 import MessageBubble from "./MessageBubble";
-import { playNotifySound, showBrowserNotification } from "../lib/notifyClient";
 
 export default function ChatWindow({
   currentUser,
@@ -23,19 +19,46 @@ export default function ChatWindow({
   onBack,
 }) {
   const router = useRouter();
+  const bottomRef = useRef(null);
+  const chatBodyRef = useRef(null);
 
   const [messages, setMessages] = useState([]);
-  const [lastMessageId, setLastMessageId] = useState(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
-  const [showChatMenu, setShowChatMenu] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     if (!conversation?._id || !currentUser?._id) return;
-    fetchMessages();
+    fetchMessages(true);
   }, [conversation?._id, currentUser?._id]);
 
-  async function fetchMessages() {
+  useEffect(() => {
+    scrollToBottom(false);
+  }, [messages.length]);
+
+  useEffect(() => {
+    function handleResize() {
+      setTimeout(() => {
+        scrollToBottom(false);
+      }, 250);
+    }
+
+    window.visualViewport?.addEventListener("resize", handleResize);
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", handleResize);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  function scrollToBottom(smooth = true) {
+    bottomRef.current?.scrollIntoView({
+      behavior: smooth ? "smooth" : "auto",
+      block: "end",
+    });
+  }
+
+  async function fetchMessages(shouldScroll = false) {
     try {
       setMessagesLoading(true);
 
@@ -45,6 +68,10 @@ export default function ChatWindow({
 
       const result = await res.json();
       setMessages(result?.messages || []);
+
+      if (shouldScroll) {
+        setTimeout(() => scrollToBottom(false), 100);
+      }
     } catch (error) {
       console.error("Fetch messages error:", error);
     } finally {
@@ -69,96 +96,54 @@ export default function ChatWindow({
     const result = await res.json();
 
     if (result?.success) {
-      fetchMessages();
+      fetchMessages(true);
     }
   }
 
-  async function clearChat() {
-    const ok = confirm("Clear all messages in this chat?");
-    if (!ok) return;
+  async function sendMessage(payload = {}) {
+    try {
+      if (!conversation?._id) {
+        alert("Select chat first");
+        return;
+      }
 
-    const res = await fetch(
-      `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-      { method: "DELETE" }
-    );
+      if (!currentUser?._id) {
+        alert("Login again");
+        return;
+      }
 
-    const result = await res.json();
+      const messagePayload = {
+        conversationId: conversation._id,
+        senderId: currentUser._id,
+        text: payload?.text || "",
+        attachments: payload?.attachments || [],
+        location: payload?.location || null,
+      };
 
-    if (result?.success) {
-      setMessages([]);
-      setShowChatMenu(false);
-    }
-  }
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(messagePayload),
+      });
 
-  async function deleteChat() {
-    const ok = confirm(
-      conversation?.type === "group"
-        ? "Leave/delete this group?"
-        : "Delete this chat?"
-    );
+      const result = await res.json().catch(() => null);
 
-    if (!ok) return;
+      if (!res.ok || !result?.success) {
+        alert(result?.error || "Message send failed");
+        return;
+      }
 
-    const res = await fetch(
-      `/api/conversations?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-      { method: "DELETE" }
-    );
-
-    const result = await res.json();
-
-    if (result?.success) {
-      setShowChatMenu(false);
+      setMessages((prev) => [...prev, result.message]);
       onRefreshConversations?.();
-      router.push("/chat");
+
+      setTimeout(() => scrollToBottom(true), 80);
+    } catch (error) {
+      console.error("Send message error:", error);
+      alert("Message send failed");
     }
   }
-
-async function sendMessage(payload = {}) {
-  try {
-    if (!conversation?._id) {
-      alert("Select chat first");
-      return;
-    }
-
-    if (!currentUser?._id) {
-      alert("Login again");
-      return;
-    }
-
-    const messagePayload = {
-      conversationId: conversation._id,
-      senderId: currentUser._id,
-      text: payload?.text || "",
-      attachments: payload?.attachments || [],
-      location: payload?.location || null,
-    };
-
-    console.log("SEND MESSAGE PAYLOAD:", messagePayload);
-
-    const res = await fetch("/api/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(messagePayload),
-    });
-
-    const result = await res.json().catch(() => null);
-
-    console.log("SEND MESSAGE RESULT:", result);
-
-    if (!res.ok || !result?.success) {
-      alert(result?.error || "Message send failed");
-      return;
-    }
-
-    setMessages((prev) => [...prev, result.message]);
-    onRefreshConversations?.();
-  } catch (error) {
-    console.error("Send message error:", error);
-    alert("Message send failed");
-  }
-}
 
   async function startCall(type) {
     if (!conversation?._id) {
@@ -201,14 +186,10 @@ async function sendMessage(payload = {}) {
       attachments: [],
       location: null,
     });
-
-    fetchMessages();
   }
 
   function getChatTitle() {
-    if (conversation?.type === "group") {
-      return conversation?.name || "Group";
-    }
+    if (conversation?.type === "group") return conversation?.name || "Group";
 
     const receiver = conversation?.members?.find(
       (member) => member?._id !== currentUser?._id
@@ -243,38 +224,20 @@ async function sendMessage(payload = {}) {
     if (!conversation?._id || !currentUser?._id) return;
 
     const interval = setInterval(async () => {
-      const res = await fetch(
-        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`
-      );
+      try {
+        const res = await fetch(
+          `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`
+        );
 
-      const result = await res.json();
-      const latestMessage = result?.messages?.[result?.messages?.length - 1];
-
-      setMessages(result?.messages || []);
-
-      if (
-        latestMessage?._id &&
-        lastMessageId &&
-        latestMessage?._id !== lastMessageId &&
-        latestMessage?.sender?._id !== currentUser?._id
-      ) {
-        playNotifySound("message");
-
-        showBrowserNotification({
-          title: latestMessage?.sender?.name || "New message",
-          body: latestMessage?.text || "Sent an attachment",
-          icon: latestMessage?.sender?.avatar,
-          url: `/chat?conversationId=${conversation?._id}`,
-        });
-      }
-
-      if (latestMessage?._id) {
-        setLastMessageId(latestMessage?._id);
+        const result = await res.json();
+        setMessages(result?.messages || []);
+      } catch (error) {
+        console.error("Message polling error:", error);
       }
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [conversation?._id, currentUser?._id, lastMessageId]);
+  }, [conversation?._id, currentUser?._id]);
 
   if (!conversation?._id) {
     return (
@@ -291,9 +254,9 @@ async function sendMessage(payload = {}) {
   }
 
   return (
-    <main className="chat-window-shell d-flex flex-column">
-     <header className="chat-header d-flex align-items-center justify-content-between px-2 px-sm-3">
-        <div className="d-flex align-items-center min-w-0">
+    <main className="chat-window-shell">
+      <header className="chat-header">
+        <div className="d-flex align-items-center min-w-0 flex-grow-1">
           <button
             type="button"
             onClick={onBack}
@@ -309,7 +272,7 @@ async function sendMessage(payload = {}) {
             width="42"
             height="42"
             alt="chat"
-            onClick={()=> setPreviewImage(getChatAvatar())}
+            onClick={() => setPreviewImage(getChatAvatar())}
           />
 
           <div className="ms-2 ms-sm-3 min-w-0">
@@ -322,7 +285,7 @@ async function sendMessage(payload = {}) {
           </div>
         </div>
 
-        <div className="d-flex align-items-center gap-1 gap-sm-2 position-relative">
+        <div className="d-flex align-items-center gap-1 gap-sm-2 flex-shrink-0">
           <button
             type="button"
             onClick={() => startCall("audio")}
@@ -340,13 +303,10 @@ async function sendMessage(payload = {}) {
           >
             <FaVideo />
           </button>
-
-
-
         </div>
       </header>
-     
-      <section className="chat-body flex-grow-1 min-h-0 overflow-auto">
+
+      <section ref={chatBodyRef} className="chat-body">
         {messagesLoading ? (
           <MessageSkeleton />
         ) : messages?.length === 0 ? (
@@ -359,45 +319,50 @@ async function sendMessage(payload = {}) {
                 message={message}
                 isOwnMessage={message?.sender?._id === currentUser?._id}
                 onDeleteMessage={deleteMessage}
-                MessageBubble={MessageBubble}
-                 onPreviewImage={setPreviewImage}
+                onPreviewImage={setPreviewImage}
               />
             ))}
+
+            <div ref={bottomRef} />
           </div>
         )}
       </section>
 
       <div className="chat-composer-wrap">
-        <Composer onSend={sendMessage} currentUser={currentUser} />
+        <Composer
+          onSend={sendMessage}
+          currentUser={currentUser}
+          onFocusInput={() => {
+            setTimeout(() => scrollToBottom(false), 350);
+          }}
+        />
       </div>
 
       {previewImage && (
-  <div
-    className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-100 d-flex align-items-center justify-content-center"
-    style={{
-      zIndex: 99999,
-    }}
-    onClick={() => setPreviewImage(null)}
-  >
-    <button
-      className="btn btn-danger position-absolute top-0 end-0 m-3"
-      onClick={() => setPreviewImage(null)}
-    >
-      ✕
-    </button>
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-100 d-flex align-items-center justify-content-center"
+          style={{ zIndex: 99999 }}
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            className="btn btn-danger position-absolute top-0 end-0 m-3"
+            onClick={() => setPreviewImage(null)}
+          >
+            ✕
+          </button>
 
-    <img
-      src={previewImage}
-      alt="preview"
-      style={{
-        maxWidth: "95%",
-        maxHeight: "95%",
-        objectFit: "contain",
-      }}
-      onClick={(e) => e.stopPropagation()}
-    />
-  </div>
-)}
+          <img
+            src={previewImage}
+            alt="preview"
+            style={{
+              maxWidth: "95%",
+              maxHeight: "95%",
+              objectFit: "contain",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </main>
   );
 }
