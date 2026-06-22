@@ -254,8 +254,8 @@ export default function ChatWindow({
   }
 
   return (
-    <main className="chat-window-shell">
-      <header className="chat-header">
+<main className="chat-page-fixed">
+      <header className="chat-header-fixed">
         <div className="d-flex align-items-center min-w-0 flex-grow-1">
           <button
             type="button"
@@ -306,64 +306,33 @@ export default function ChatWindow({
         </div>
       </header>
 
-      <section ref={chatBodyRef} className="chat-body">
-        {messagesLoading ? (
-          <MessageSkeleton />
-        ) : messages?.length === 0 ? (
-          <EmptyChat onQuickMessage={sendQuickMessage} title={getChatTitle()} />
-        ) : (
-          <div className="chat-message-list">
-            {messages?.map((message) => (
-              <MessageBubble
-                key={message?._id}
-                message={message}
-                isOwnMessage={message?.sender?._id === currentUser?._id}
-                onDeleteMessage={deleteMessage}
-                onPreviewImage={setPreviewImage}
-              />
-            ))}
-
-            <div ref={bottomRef} />
-          </div>
-        )}
-      </section>
-
-      <div className="chat-composer-wrap">
-        <Composer
-          onSend={sendMessage}
-          currentUser={currentUser}
-          onFocusInput={() => {
-            setTimeout(() => scrollToBottom(false), 350);
-          }}
+  <section className="chat-body-fixed">
+    <div className="chat-message-list">
+      {messages.map((message) => (
+        <MessageBubble
+          key={message?._id}
+          message={message}
+          isOwnMessage={message?.sender?._id === currentUser?._id}
+          onDeleteMessage={deleteMessage}
+          onPreviewImage={setPreviewImage}
         />
-      </div>
+      ))}
+      <div ref={bottomRef} />
+    </div>
+  </section>
 
-      {previewImage && (
-        <div
-          className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-100 d-flex align-items-center justify-content-center"
-          style={{ zIndex: 99999 }}
-          onClick={() => setPreviewImage(null)}
-        >
-          <button
-            className="btn btn-danger position-absolute top-0 end-0 m-3"
-            onClick={() => setPreviewImage(null)}
-          >
-            ✕
-          </button>
-
-          <img
-            src={previewImage}
-            alt="preview"
-            style={{
-              maxWidth: "95%",
-              maxHeight: "95%",
-              objectFit: "contain",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
-    </main>
+  <div className="chat-composer-fixed">
+    <Composer
+      onSend={sendMessage}
+      currentUser={currentUser}
+      onFocusInput={() => {
+        setTimeout(() => {
+          bottomRef.current?.scrollIntoView({ behavior: "auto" });
+        }, 300);
+      }}
+    />
+  </div>
+</main>
   );
 }
 
