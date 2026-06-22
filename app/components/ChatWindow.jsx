@@ -292,7 +292,7 @@ async function sendMessage(payload = {}) {
 
   return (
     <main className="chat-window-shell d-flex flex-column">
-      <header className="chat-header d-flex align-items-center justify-content-between px-2 px-sm-3">
+      <div class="chat-header d-flex align-items-center justify-content-between px-2 px-sm-3 position-fixed top-0 start-0 w-100">
         <div className="d-flex align-items-center min-w-0">
           <button
             type="button"
