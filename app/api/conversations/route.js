@@ -10,11 +10,25 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
 
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: "userId required" },
+        { status: 400 }
+      );
+    }
+
     const conversations = await Conversation.find({
       members: userId,
     })
       .populate("members", "name email avatar about isOnline lastSeen")
-      .populate("lastMessage")
+      .populate({
+        path: "lastMessage",
+        populate: {
+          path: "sender",
+          select: "name avatar",
+        },
+      })
+      .populate("admins", "name email avatar")
       .sort({ updatedAt: -1 })
       .lean();
 
@@ -24,9 +38,18 @@ export async function GET(req) {
           conversation: conversation?._id,
         });
 
+        const unreadCount = await Message.countDocuments({
+          conversation: conversation?._id,
+          sender: { $ne: userId },
+          deletedForEveryone: { $ne: true },
+          deletedFor: { $ne: userId },
+          seenBy: { $ne: userId },
+        });
+
         return {
           ...conversation,
           messagesCount,
+          unreadCount,
         };
       })
     );
@@ -59,7 +82,14 @@ export async function POST(req) {
 
       if (exists) {
         const populatedExists = await Conversation.findById(exists?._id)
-          .populate("members", "name email avatar about")
+          .populate("members", "name email avatar about isOnline lastSeen")
+          .populate({
+            path: "lastMessage",
+            populate: {
+              path: "sender",
+              select: "name avatar",
+            },
+          })
           .populate("admins", "name email avatar");
 
         return NextResponse.json({
@@ -76,7 +106,7 @@ export async function POST(req) {
       const populatedConversation = await Conversation.findById(
         conversation?._id
       )
-        .populate("members", "name email avatar about")
+        .populate("members", "name email avatar about isOnline lastSeen")
         .populate("admins", "name email avatar");
 
       return NextResponse.json({
@@ -97,7 +127,7 @@ export async function POST(req) {
       const populatedConversation = await Conversation.findById(
         conversation?._id
       )
-        .populate("members", "name email avatar about")
+        .populate("members", "name email avatar about isOnline lastSeen")
         .populate("admins", "name email avatar");
 
       return NextResponse.json({

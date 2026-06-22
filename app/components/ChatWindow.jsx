@@ -28,6 +28,7 @@ export default function ChatWindow({
   const [lastMessageId, setLastMessageId] = useState(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [showChatMenu, setShowChatMenu] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     if (!conversation?._id || !currentUser?._id) return;
@@ -308,6 +309,7 @@ async function sendMessage(payload = {}) {
             width="42"
             height="42"
             alt="chat"
+            onClick={()=> setPreviewImage(getChatAvatar())}
           />
 
           <div className="ms-2 ms-sm-3 min-w-0">
@@ -357,6 +359,8 @@ async function sendMessage(payload = {}) {
                 message={message}
                 isOwnMessage={message?.sender?._id === currentUser?._id}
                 onDeleteMessage={deleteMessage}
+                MessageBubble={MessageBubble}
+                 onPreviewImage={setPreviewImage}
               />
             ))}
           </div>
@@ -366,6 +370,34 @@ async function sendMessage(payload = {}) {
       <div className="chat-composer-wrap">
         <Composer onSend={sendMessage} currentUser={currentUser} />
       </div>
+
+      {previewImage && (
+  <div
+    className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-100 d-flex align-items-center justify-content-center"
+    style={{
+      zIndex: 99999,
+    }}
+    onClick={() => setPreviewImage(null)}
+  >
+    <button
+      className="btn btn-danger position-absolute top-0 end-0 m-3"
+      onClick={() => setPreviewImage(null)}
+    >
+      ✕
+    </button>
+
+    <img
+      src={previewImage}
+      alt="preview"
+      style={{
+        maxWidth: "95%",
+        maxHeight: "95%",
+        objectFit: "contain",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    />
+  </div>
+)}
     </main>
   );
 }

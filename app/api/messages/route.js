@@ -44,6 +44,7 @@ export async function POST(req) {
       text: body?.text || "",
       attachments: body?.attachments || [],
       location: body?.location || null,
+        seenBy: [body?.senderId],
     });
 
     await Conversation.findByIdAndUpdate(body?.conversationId, {

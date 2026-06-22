@@ -167,7 +167,8 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={handleRemovePhoto}
-              className="bg-red-500 text-white px-5 py-2 rounded-xl font-bold rounded"
+              className="btn btn-danger"
+              disabled={!form?.avatar}
             >
               Remove
             </button>

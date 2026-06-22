@@ -1,18 +1,39 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FaEllipsisV, FaFileAlt, FaMapMarkerAlt, FaTrashAlt } from "react-icons/fa";
+import {
+  FaEllipsisV,
+  FaFileAlt,
+  FaMapMarkerAlt,
+  FaTrashAlt,
+} from "react-icons/fa";
 
 export default function MessageBubble({
   message,
   isOwnMessage,
   onDeleteMessage,
+  onPreviewImage,
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
 
   const senderName = isOwnMessage ? "You" : message?.sender?.name || "User";
   const isDeleted = message?.deletedForEveryone;
+  const longPressTimerRef = useRef(null);
+
+function handleLongPressStart() {
+  if (!isOwnMessage || isDeleted) return;
+
+  longPressTimerRef.current = setTimeout(() => {
+    setShowMenu(true);
+  }, 550);
+}
+
+function handleLongPressEnd() {
+  if (longPressTimerRef.current) {
+    clearTimeout(longPressTimerRef.current);
+  }
+}
 
   useEffect(() => {
     function handleOutsideClick(e) {
@@ -31,17 +52,25 @@ export default function MessageBubble({
   }, []);
 
   return (
-    <div className={`d-flex mb-2 px-2 ${isOwnMessage ? "justify-content-end" : "justify-content-start"}`}>
-      <div
-        className="position-relative rounded-4 shadow-sm px-3 py-2 message-bubble-card"
-        style={{
-          maxWidth: "min(78%, 520px)",
-          background: isOwnMessage ? "#005c4b" : "#202c33",
-          color: "#fff",
-          borderTopRightRadius: isOwnMessage ? "6px" : "18px",
-          borderTopLeftRadius: isOwnMessage ? "18px" : "6px",
-        }}
-      >
+    <div
+      className={`d-flex mb-2 px-2 ${isOwnMessage ? "justify-content-end" : "justify-content-start"}`}
+    >
+<div
+  className="position-relative rounded-4 shadow-sm px-3 py-2 message-bubble-card"
+  onTouchStart={handleLongPressStart}
+  onTouchEnd={handleLongPressEnd}
+  onTouchCancel={handleLongPressEnd}
+  onMouseDown={handleLongPressStart}
+  onMouseUp={handleLongPressEnd}
+  onMouseLeave={handleLongPressEnd}
+  style={{
+    maxWidth: "min(78%, 520px)",
+    background: isOwnMessage ? "#005c4b" : "#202c33",
+    color: "#fff",
+    borderTopRightRadius: isOwnMessage ? "6px" : "18px",
+    borderTopLeftRadius: isOwnMessage ? "18px" : "6px",
+  }}
+>
         {isOwnMessage && !isDeleted && (
           <div ref={menuRef}>
             <button
@@ -74,9 +103,7 @@ export default function MessageBubble({
           </div>
         )}
 
-        <div className="fw-bold small text-success mb-1 pe-4">
-          {senderName}
-        </div>
+        <div className="fw-bold small text-success mb-1 pe-4">{senderName}</div>
 
         {isDeleted ? (
           <div className="fst-italic text-light opacity-75 small">
@@ -85,7 +112,10 @@ export default function MessageBubble({
         ) : (
           <>
             {message?.text && (
-              <div className="pe-4 text-break" style={{ whiteSpace: "pre-wrap" }}>
+              <div
+                className="pe-4 text-break"
+                style={{ whiteSpace: "pre-wrap" }}
+              >
                 {message.text}
               </div>
             )}
@@ -93,7 +123,16 @@ export default function MessageBubble({
             {message?.attachments?.map((file, index) => (
               <div key={`${file?.url || file?.name}-${index}`} className="mt-2">
                 {file?.type === "image" && (
-                  <img src={file?.url} alt="" className="img-fluid rounded-4" />
+                  <img
+                    src={file?.url}
+                    alt=""
+                    className="img-fluid rounded-4 cursor-pointer"
+                    style={{
+                      maxHeight: "300px",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => onPreviewImage(file?.url)}
+                  />
                 )}
 
                 {file?.type === "video" && (
@@ -112,7 +151,9 @@ export default function MessageBubble({
                     className="d-flex align-items-center gap-2 bg-dark bg-opacity-50 rounded-4 p-3 text-white text-decoration-none"
                   >
                     <FaFileAlt className="text-success" />
-                    <span className="text-truncate">{file?.name || "File"}</span>
+                    <span className="text-truncate">
+                      {file?.name || "File"}
+                    </span>
                   </a>
                 )}
               </div>
@@ -132,7 +173,10 @@ export default function MessageBubble({
           </>
         )}
 
-        <div className="text-end mt-1 small" style={{ fontSize: 10, color: "#d8d8d8" }}>
+        <div
+          className="text-end mt-1 small"
+          style={{ fontSize: 10, color: "#d8d8d8" }}
+        >
           {message?.createdAt
             ? new Date(message.createdAt).toLocaleTimeString([], {
                 hour: "2-digit",
