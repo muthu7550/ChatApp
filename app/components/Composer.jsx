@@ -214,7 +214,7 @@ export default function Composer({ onSend, currentUser }) {
           <button
             type="button"
             onClick={handleSend}
-            disabled={uploading}
+            disabled={uploading|| !text}
             className="btn btn-success rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center"
             style={{ width: 44, height: 44 }}
           >
