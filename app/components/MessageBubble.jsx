@@ -106,7 +106,7 @@ export default function MessageBubble({
                     setShowMenu(false);
                     onDeleteMessage(message?._id, "everyone");
                   }}
-                  className="btn btn-dark w-100 text-start text-danger d-flex align-items-center gap-2 px-3 py-2 border-0"
+                  className="btn btn-dark w-100 text-start text-danger d-flex align-items-center gap-2 px-3 py-2 border-0 text-nowrap"
                 >
                   <FaTrashAlt size={14} />
                   <span className="small fw-semibold">
