@@ -5,7 +5,7 @@ export default function HomePage() {
     <main className="min-h-screen bg-zinc-950 text-white flex items-center justify-center px-6">
       <section className="max-w-4xl text-center">
         <div className="inline-flex rounded-full border border-emerald-400/30 px-4 py-2 text-emerald-300 mb-6">
-          WhatsApp ah? illa boss... ChatterBox Pro Max 😂
+          WhatsApp ah? illa boss... ChatterBox Pro Max
         </div>
 
         <h1 className="text-5xl md:text-7xl font-black tracking-tight">

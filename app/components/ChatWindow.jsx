@@ -327,7 +327,7 @@ const res = await fetch(
       <main className="chat-window-shell d-none d-md-flex align-items-center justify-content-center">
         <div className="text-center px-4">
           <div className="display-1 mb-3">💬</div>
-          <h1 className="fw-black text-white">ChatterBox Pro Max 😂</h1>
+          <h1 className="fw-black text-white">ChatterBox Pro Max </h1>
           <p className="text-secondary mt-3">
             Select a chat, search your network, or create a group.
           </p>

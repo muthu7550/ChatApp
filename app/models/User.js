@@ -9,7 +9,7 @@ const UserSchema = new mongoose.Schema(
 
     about: {
       type: String,
-      default: "Hey there! I am using ChatterBox Pro Max 😂",
+      default: "Hey there! I am using ChatterBox Pro Max",
     },
 
     isOnline: { type: Boolean, default: false },
