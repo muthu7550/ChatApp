@@ -71,18 +71,18 @@ if (res.status === 401) {
     return false;
   }
 
-  useEffect(() => {
-    if (!currentUser?._id) return;
+useEffect(() => {
+  if (!currentUser?._id) return;
 
-    fetchConversations(true);
-    fetchUsers("", true);
+  fetchConversations(conversations.length === 0);
+  fetchUsers("", users.length === 0);
 
-    const interval = setInterval(() => {
-      fetchConversations(false);
-    }, 5000);
+  const interval = setInterval(() => {
+    fetchConversations(false);
+  }, 5000);
 
-    return () => clearInterval(interval);
-  }, [currentUser?._id, refreshKey]);
+  return () => clearInterval(interval);
+}, [currentUser?._id, refreshKey]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -107,25 +107,28 @@ if (res.status === 401) {
     };
   }, []);
 
-  async function fetchConversations(showLoader = false) {
-    try {
-      if (showLoader) setConversationsLoading(true);
-
-      const res = await fetch(`/api/conversations?userId=${currentUser?._id}`, {
-        headers: getAuthHeaders(),
-      });
-
-      if (await handleUnauthorized(res)) return;
-
-      const result = await res.json();
-      setConversations(result?.conversations || []);
-    } catch (error) {
-      console.error("Fetch conversations error:", error);
-      setConversations([]);
-    } finally {
-      if (showLoader) setConversationsLoading(false);
+async function fetchConversations(showLoader = false) {
+  try {
+    if (showLoader && conversations.length === 0) {
+      setConversationsLoading(true);
     }
+
+    const res = await fetch(`/api/conversations?userId=${currentUser?._id}`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (await handleUnauthorized(res)) return;
+
+    const result = await res.json();
+
+    setConversations(result?.conversations || []);
+  } catch (error) {
+    console.error("Fetch conversations error:", error);
+    setConversations([]);
+  } finally {
+    if (showLoader) setConversationsLoading(false);
   }
+}
 
   async function fetchUsers(searchText = "", showLoader = false) {
     try {
@@ -249,7 +252,7 @@ const token = localStorage.getItem("token");
       router.push(`/chat?conversationId=${result?.conversation?._id}`);
 
       setTimeout(() => {
-        fetchConversations(false);
+      fetchConversations(true);
       }, 300);
     } catch (error) {
       console.error("Start direct chat error:", error);
@@ -277,7 +280,7 @@ const token = localStorage.getItem("token");
       onRefresh?.();
       onSelectConversation(null);
       router.push("/chat");
-      fetchConversations(false);
+     fetchConversations(true);
     }
   }
 
@@ -380,7 +383,7 @@ const token = localStorage.getItem("token");
     onSelectConversation(conversation);
     setMobileChatOpen?.(true);
     router.push(`/chat?conversationId=${conversation?._id}`);
-    fetchConversations(false);
+    fetchConversations(true);
   }
 
   function renderConversationItem(conversation) {
@@ -656,7 +659,7 @@ const token = localStorage.getItem("token");
             }
 
             onRefresh?.();
-            fetchConversations(false);
+          fetchConversations(true);
           }}
         />
       )}

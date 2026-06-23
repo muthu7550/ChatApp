@@ -23,6 +23,8 @@ export default function CallClient() {
   const [user, setUser] = useState(null);
   const [ending, setEnding] = useState(false);
 
+  const backToChatUrl = room ? `/chat?conversationId=${room}` : "/chat";
+
   useEffect(() => {
     async function getToken() {
       const storedUser = JSON.parse(localStorage.getItem("user") || "null");
@@ -38,13 +40,13 @@ export default function CallClient() {
         return;
       }
 
-      const token = localStorage.getItem("token");
+      const authToken = localStorage.getItem("token");
 
       const res = await fetch("/api/livekit-token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-             Authorization: token ? `Bearer ${token}` : "",
+          Authorization: authToken ? `Bearer ${authToken}` : "",
         },
         body: JSON.stringify({
           roomName: room,
@@ -52,6 +54,16 @@ export default function CallClient() {
           name: storedUser.name,
         }),
       });
+
+      if (res.status === 401) {
+        localStorage.clear();
+        sessionStorage.setItem(
+          "sessionMessage",
+          "Your session has expired. Please login again."
+        );
+        router.replace("/login");
+        return;
+      }
 
       const result = await res.json().catch(() => null);
 
@@ -69,7 +81,7 @@ export default function CallClient() {
   async function endCall() {
     if (ending) return;
 
-const token = localStorage.getItem("token"); 
+    const authToken = localStorage.getItem("token");
 
     try {
       setEnding(true);
@@ -77,10 +89,10 @@ const token = localStorage.getItem("token");
       if (callId) {
         await fetch("/api/calls", {
           method: "PUT",
- headers: {
-    "Content-Type": "application/json",
-    Authorization: token ? `Bearer ${token}` : "",
-  },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: authToken ? `Bearer ${authToken}` : "",
+          },
           body: JSON.stringify({
             callId,
             status: "ended",
@@ -88,7 +100,7 @@ const token = localStorage.getItem("token");
         });
       }
     } finally {
-      router.replace("/chat");
+      router.replace(backToChatUrl);
     }
   }
 
@@ -98,7 +110,9 @@ const token = localStorage.getItem("token");
         <div className="call-error-card">
           <h2>Call Error</h2>
           <p>{error}</p>
-          <button onClick={() => router.replace("/chat")}>Back to Chat</button>
+          <button onClick={() => router.replace(backToChatUrl)}>
+            Back to Chat
+          </button>
         </div>
       </main>
     );
@@ -119,7 +133,9 @@ const token = localStorage.getItem("token");
         />
 
         <h1>
-          {type === "video" ? "Starting Video Call..." : "Starting Audio Call..."}
+          {type === "video"
+            ? "Starting Video Call..."
+            : "Starting Audio Call..."}
         </h1>
 
         <p>Connecting securely...</p>
@@ -142,7 +158,6 @@ const token = localStorage.getItem("token");
         <VideoConference />
         <RoomAudioRenderer />
       </LiveKitRoom>
-
     </main>
   );
 }

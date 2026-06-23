@@ -10,9 +10,10 @@ export async function proxy(req) {
   ];
 
   const isPublicRoute = publicRoutes.some((route) =>
-    path.startsWith(route)
+    path === route || path.startsWith(`${route}/`)
   );
 
+  // Do not check token for login/register APIs
   if (isPublicRoute) {
     return NextResponse.next();
   }
@@ -36,6 +37,7 @@ export async function proxy(req) {
 
   try {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+
     await jwtVerify(token, secret);
 
     return NextResponse.next();
