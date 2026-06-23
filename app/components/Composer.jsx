@@ -9,13 +9,18 @@ import {
   FaPaperPlane,
   FaPlus,
   FaTimes,
+  FaExclamationTriangle,
 } from "react-icons/fa";
+
+const MAX_FILE_SIZE_MB = 4;
+const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export default function Composer({ onSend, currentUser }) {
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [pendingFile, setPendingFile] = useState(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [largeFileError, setLargeFileError] = useState(null);
 
   const attachRef = useRef(null);
 
@@ -38,7 +43,9 @@ export default function Composer({ onSend, currentUser }) {
   async function handleSend() {
     if (!currentUser?._id) return alert("Please login again");
     if (!text.trim() && !pendingFile) return;
-setText('')
+
+    setText("");
+
     await onSend({
       text: text.trim(),
       attachments: pendingFile ? [pendingFile] : [],
@@ -53,22 +60,46 @@ setText('')
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const fileSizeMb = file.size / 1024 / 1024;
+
+    if (file.size > MAX_FILE_SIZE) {
+      setShowAttachMenu(false);
+      setLargeFileError({
+        name: file.name,
+        size: fileSizeMb.toFixed(2),
+        max: MAX_FILE_SIZE_MB,
+      });
+      e.target.value = "";
+      return;
+    }
+
     try {
       setUploading(true);
       setShowAttachMenu(false);
 
       const formData = new FormData();
       formData.append("file", file);
-  const token = localStorage.getItem("token");
+
+      const token = localStorage.getItem("token");
+
       const res = await fetch("/api/upload", {
         method: "POST",
-         headers: {
-    Authorization: token ? `Bearer ${token}` : "",
-  },
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
         body: formData,
       });
 
       const uploaded = await res.json().catch(() => null);
+
+      if (res.status === 413) {
+        setLargeFileError({
+          name: file.name,
+          size: fileSizeMb.toFixed(2),
+          max: MAX_FILE_SIZE_MB,
+        });
+        return;
+      }
 
       if (!res.ok || !uploaded?.success) {
         alert(uploaded?.error || "Upload failed");
@@ -113,6 +144,54 @@ setText('')
 
   return (
     <div className="bg-[#202c33] border-top border-secondary position-relative">
+      {largeFileError && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{
+            background: "rgba(0,0,0,0.75)",
+            zIndex: 99999,
+          }}
+        >
+          <div
+            className="bg-dark text-white rounded-4 shadow-lg text-center p-4"
+            style={{
+              width: "90%",
+              maxWidth: 420,
+            }}
+          >
+            <div
+              className="mx-auto rounded-circle d-flex align-items-center justify-content-center bg-danger bg-opacity-25 text-danger mb-3"
+              style={{
+                width: 72,
+                height: 72,
+                fontSize: 34,
+              }}
+            >
+              <FaExclamationTriangle />
+            </div>
+
+            <h4 className="fw-bold mb-2">File Too Large</h4>
+
+            <p className="text-secondary mb-3">
+              This file is {largeFileError.size} MB. Maximum allowed upload size
+              is {largeFileError.max} MB.
+            </p>
+
+            <div className="bg-black bg-opacity-25 rounded-3 p-2 mb-3 text-truncate small text-secondary">
+              {largeFileError.name}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setLargeFileError(null)}
+              className="btn btn-success w-100 rounded-3 fw-bold"
+            >
+              Choose Smaller File
+            </button>
+          </div>
+        </div>
+      )}
+
       {uploading && (
         <div className="px-3 px-sm-4 py-3 d-flex align-items-center gap-3 border-bottom border-secondary">
           <div className="spinner-border spinner-border-sm text-success" />
@@ -172,9 +251,27 @@ setText('')
             className="position-absolute start-0 bottom-100 ms-2 ms-sm-4 mb-2 bg-dark border border-secondary rounded-4 shadow-lg overflow-hidden"
             style={{ width: 240, zIndex: 9999 }}
           >
-            <AttachItem icon={<FaImage />} label="Image / Video" accept="image/*,video/*" onChange={handleFileUpload} disabled={uploading} />
-            <AttachItem icon={<FaFileAlt />} label="Document" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onChange={handleFileUpload} disabled={uploading} />
-            <AttachItem icon={<FaMicrophone />} label="Audio" accept="audio/*" onChange={handleFileUpload} disabled={uploading} />
+            <AttachItem
+              icon={<FaImage />}
+              label="Image / Video"
+              accept="image/*,video/*"
+              onChange={handleFileUpload}
+              disabled={uploading}
+            />
+            <AttachItem
+              icon={<FaFileAlt />}
+              label="Document"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+              onChange={handleFileUpload}
+              disabled={uploading}
+            />
+            <AttachItem
+              icon={<FaMicrophone />}
+              label="Audio"
+              accept="audio/*"
+              onChange={handleFileUpload}
+              disabled={uploading}
+            />
 
             <button
               type="button"
@@ -234,7 +331,13 @@ function AttachItem({ icon, label, accept, onChange, disabled }) {
     <label className="btn btn-dark w-100 border-0 rounded-0 text-start px-4 py-3 d-flex align-items-center gap-3">
       <span className="text-success">{icon}</span>
       <span>{label}</span>
-      <input type="file" hidden disabled={disabled} onChange={onChange} accept={accept} />
+      <input
+        type="file"
+        hidden
+        disabled={disabled}
+        onChange={onChange}
+        accept={accept}
+      />
     </label>
   );
 }
