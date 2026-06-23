@@ -38,7 +38,7 @@ export default function Composer({ onSend, currentUser }) {
   async function handleSend() {
     if (!currentUser?._id) return alert("Please login again");
     if (!text.trim() && !pendingFile) return;
-
+setText('')
     await onSend({
       text: text.trim(),
       attachments: pendingFile ? [pendingFile] : [],
