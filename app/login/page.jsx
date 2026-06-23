@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -12,6 +12,7 @@ export default function LoginPage() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -57,6 +58,15 @@ export default function LoginPage() {
     }
   }
 
+  useEffect(() => {
+    const expired = localStorage.getItem("sessionMessage");
+
+    if (expired) {
+      setSessionExpired(true);
+      sessionStorage.removeItem("sessionExpired");
+    }
+  }, []);
+
   function goToRegister() {
     router.push("/register");
   }
@@ -70,9 +80,7 @@ export default function LoginPage() {
         <div className="text-center">
           <div className="text-6xl mb-3">😂</div>
 
-          <h1 className="text-3xl font-black">
-            Login ChatterBox
-          </h1>
+          <h1 className="text-3xl font-black">Login ChatterBox</h1>
 
           <p className="text-zinc-400 text-sm mt-2">
             Welcome back! Chat, call, share files and location.
@@ -114,9 +122,7 @@ export default function LoginPage() {
         </button>
 
         <div className="text-center border-t border-zinc-800 pt-4">
-          <p className="text-sm text-zinc-400">
-            New user?
-          </p>
+          <p className="text-sm text-zinc-400">New user?</p>
 
           <button
             type="button"
@@ -127,6 +133,45 @@ export default function LoginPage() {
           </button>
         </div>
       </form>
+
+      {sessionExpired && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{
+            background: "rgba(0,0,0,0.75)",
+            zIndex: 99999,
+          }}
+        >
+          <div
+            className="bg-dark text-white p-4 rounded-4 shadow-lg text-center"
+            style={{
+              width: "90%",
+              maxWidth: "420px",
+            }}
+          >
+            <div style={{ fontSize: "60px" }}>⏰</div>
+
+            <h3 className="fw-bold mt-3">Session Expired</h3>
+
+            <p className="text-secondary mt-3">
+              Your login session has expired for security reasons. Please sign
+              in again to continue.
+            </p>
+
+            <button
+              className="btn btn-success w-100 mt-3"
+              onClick={() => {
+                setSessionExpired(false)
+  localStorage.removeItem("sessionMessage");
+
+              }
+              }
+            >
+              Login Again
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

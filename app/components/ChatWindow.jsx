@@ -24,6 +24,15 @@ export default function ChatWindow({
 }) {
   const router = useRouter();
 
+  const token =
+  typeof window !== "undefined"
+    ? localStorage.getItem("token")
+    : null;
+
+const authHeaders = {
+  Authorization: token ? `Bearer ${token}` : "",
+};
+
   const [messages, setMessages] = useState([]);
   const [lastMessageId, setLastMessageId] = useState(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -40,9 +49,12 @@ export default function ChatWindow({
     try {
       setMessagesLoading(true);
 
-      const res = await fetch(
-        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-      );
+const res = await fetch(
+  `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+  {
+    headers: authHeaders,
+  }
+);
 
       const result = await res.json();
       setMessages(result?.messages || []);
@@ -66,10 +78,13 @@ export default function ChatWindow({
 
     if (!ok) return;
 
-    const res = await fetch(
-      `/api/messages/${messageId}?userId=${currentUser?._id}&type=${type}`,
-      { method: "DELETE" },
-    );
+const res = await fetch(
+  `/api/messages/${messageId}?userId=${currentUser?._id}&type=${type}`,
+  {
+    method: "DELETE",
+    headers: authHeaders,
+  }
+);
 
     const result = await res.json();
 
@@ -82,11 +97,13 @@ export default function ChatWindow({
     const ok = confirm("Clear all messages in this chat?");
     if (!ok) return;
 
-    const res = await fetch(
-      `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-      { method: "DELETE" },
-    );
-
+const res = await fetch(
+  `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+  {
+    method: "DELETE",
+    headers: authHeaders,
+  }
+);
     const result = await res.json();
 
     if (result?.success) {
@@ -104,11 +121,13 @@ export default function ChatWindow({
 
     if (!ok) return;
 
-    const res = await fetch(
-      `/api/conversations?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-      { method: "DELETE" },
-    );
-
+const res = await fetch(
+  `/api/conversations?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+  {
+    method: "DELETE",
+    headers: authHeaders,
+  }
+);
     const result = await res.json();
 
     if (result?.success) {
@@ -119,6 +138,9 @@ export default function ChatWindow({
   }
 
   async function sendMessage(payload = {}) {
+
+    const token = localStorage.getItem("token");
+    
     try {
       if (!conversation?._id) {
         alert("Select chat first");
@@ -144,9 +166,25 @@ export default function ChatWindow({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+           Authorization: token ? `Bearer ${token}` : "",
         },
         body: JSON.stringify(messagePayload),
       });
+
+      console.log(res,"ress")
+
+if (res.status === 401) {
+  localStorage.clear();
+
+  localStorage.setItem(
+    "sessionMessage",
+    "Your session has expired. Please login again."
+  );
+
+  router.push("/login");
+  return;
+}
+
 
       const result = await res.json().catch(() => null);
 
@@ -189,9 +227,10 @@ export default function ChatWindow({
 
     const res = await fetch("/api/calls", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+headers: {
+  "Content-Type": "application/json",
+  ...authHeaders,
+},
       body: JSON.stringify({
         conversationId: conversation?._id,
         callerId: currentUser?._id,
@@ -259,9 +298,12 @@ export default function ChatWindow({
     if (!conversation?._id || !currentUser?._id) return;
 
     const interval = setInterval(async () => {
-      const res = await fetch(
-        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-      );
+const res = await fetch(
+  `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+  {
+    headers: authHeaders,
+  }
+);
 
       const result = await res.json();
       const latestMessage = result?.messages?.[result?.messages?.length - 1];

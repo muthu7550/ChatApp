@@ -38,10 +38,13 @@ export default function CallClient() {
         return;
       }
 
+      const token = localStorage.getItem("token");
+
       const res = await fetch("/api/livekit-token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+             Authorization: token ? `Bearer ${token}` : "",
         },
         body: JSON.stringify({
           roomName: room,
@@ -66,15 +69,18 @@ export default function CallClient() {
   async function endCall() {
     if (ending) return;
 
+const token = localStorage.getItem("token"); 
+
     try {
       setEnding(true);
 
       if (callId) {
         await fetch("/api/calls", {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
+ headers: {
+    "Content-Type": "application/json",
+    Authorization: token ? `Bearer ${token}` : "",
+  },
           body: JSON.stringify({
             callId,
             status: "ended",

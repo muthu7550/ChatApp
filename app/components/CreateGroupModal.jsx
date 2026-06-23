@@ -28,16 +28,14 @@ export default function CreateGroupModal({
   const filteredUsers = useMemo(() => {
     const value = search.toLowerCase().trim();
 
-    return users.filter((user) =>
-      user?.name?.toLowerCase().includes(value)
-    );
+    return users.filter((user) => user?.name?.toLowerCase().includes(value));
   }, [users, search]);
 
   function toggleUser(userId) {
     setSelectedUsers((prev) =>
       prev.includes(userId)
         ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
+        : [...prev, userId],
     );
   }
 
@@ -45,7 +43,7 @@ export default function CreateGroupModal({
     return (
       user?.avatar ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        user?.name || "User"
+        user?.name || "User",
       )}&background=00a884&color=fff`
     );
   }
@@ -54,7 +52,7 @@ export default function CreateGroupModal({
     return (
       avatar ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        name || "Group"
+        name || "Group",
       )}&background=00a884&color=fff`
     );
   }
@@ -89,9 +87,12 @@ export default function CreateGroupModal({
 
       const formData = new FormData();
       formData.append("file", file);
-
+      const token = localStorage.getItem("token");
       const res = await fetch("/api/upload", {
         method: "POST",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
         body: formData,
       });
 
@@ -133,11 +134,12 @@ export default function CreateGroupModal({
       setCreating(true);
 
       const members = [currentUser._id, ...selectedUsers];
-
+const token = localStorage.getItem("token");
       const res = await fetch("/api/conversations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
         },
         body: JSON.stringify({
           type: "group",
@@ -314,7 +316,9 @@ export default function CreateGroupModal({
           </div>
 
           <div className="mb-3">
-            <label className="form-label small text-secondary">Group name</label>
+            <label className="form-label small text-secondary">
+              Group name
+            </label>
 
             <input
               value={name}
@@ -326,7 +330,9 @@ export default function CreateGroupModal({
           </div>
 
           <div className="mb-3">
-            <label className="form-label small text-secondary">Add members</label>
+            <label className="form-label small text-secondary">
+              Add members
+            </label>
 
             <div className="position-relative">
               <FaSearch className="position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary" />
@@ -525,7 +531,7 @@ function getCroppedBlob(imageSrc, crop) {
         0,
         0,
         crop.width,
-        crop.height
+        crop.height,
       );
 
       canvas.toBlob(
@@ -534,7 +540,7 @@ function getCroppedBlob(imageSrc, crop) {
           resolve(blob);
         },
         "image/jpeg",
-        0.9
+        0.9,
       );
     };
 

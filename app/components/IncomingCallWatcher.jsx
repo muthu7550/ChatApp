@@ -82,11 +82,14 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
     handledCallRef.current.add(callToHandle?._id);
     setIncomingCall(null);
 
+    const token = localStorage.getItem("token");
+
     await fetch("/api/calls", {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+ headers: {
+    "Content-Type": "application/json",
+    Authorization: token ? `Bearer ${token}` : "",
+  },
       body: JSON.stringify({
         callId: callToHandle?._id,
         status,

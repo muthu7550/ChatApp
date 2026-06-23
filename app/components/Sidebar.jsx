@@ -46,6 +46,31 @@ export default function Sidebar({
   const privateChats = conversations?.filter((c) => c?.type === "direct");
   const groupChats = conversations?.filter((c) => c?.type === "group");
 
+  function getAuthHeaders(extraHeaders = {}) {
+    const token = localStorage.getItem("token");
+
+    return {
+      Authorization: token ? `Bearer ${token}` : "",
+      ...extraHeaders,
+    };
+  }
+
+  async function handleUnauthorized(res) {
+if (res.status === 401) {
+  localStorage.clear();
+
+  localStorage.setItem(
+    "sessionMessage",
+    "Your session has expired. Please login again."
+  );
+
+  router.push("/login");
+  return;
+}
+
+    return false;
+  }
+
   useEffect(() => {
     if (!currentUser?._id) return;
 
@@ -86,9 +111,13 @@ export default function Sidebar({
     try {
       if (showLoader) setConversationsLoading(true);
 
-      const res = await fetch(`/api/conversations?userId=${currentUser?._id}`);
-      const result = await res.json();
+      const res = await fetch(`/api/conversations?userId=${currentUser?._id}`, {
+        headers: getAuthHeaders(),
+      });
 
+      if (await handleUnauthorized(res)) return;
+
+      const result = await res.json();
       setConversations(result?.conversations || []);
     } catch (error) {
       console.error("Fetch conversations error:", error);
@@ -103,8 +132,13 @@ export default function Sidebar({
       if (showLoader) setUsersLoading(true);
 
       const res = await fetch(
-        `/api/users?userId=${currentUser?._id}&search=${searchText}`
+        `/api/users?userId=${currentUser?._id}&search=${searchText}`,
+        {
+          headers: getAuthHeaders(),
+        }
       );
+
+      if (await handleUnauthorized(res)) return;
 
       const result = await res.json();
       setUsers(result?.users || []);
@@ -117,9 +151,14 @@ export default function Sidebar({
   }
 
   async function startCallFromNetwork(receiverId, type) {
+
+    const token = localStorage.getItem("token");
     const res = await fetch("/api/conversations", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+ headers: {
+    "Content-Type": "application/json",
+    Authorization: token ? `Bearer ${token}` : "",
+  },
       body: JSON.stringify({
         type: "direct",
         currentUserId: currentUser?._id,
@@ -127,20 +166,27 @@ export default function Sidebar({
       }),
     });
 
+    if (await handleUnauthorized(res)) return;
+
     const result = await res.json();
 
     if (result?.success) {
       const conversationId = result?.conversation?._id;
-
+const token = localStorage.getItem("token");  
       const callRes = await fetch("/api/calls", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+ headers: {
+    "Content-Type": "application/json",
+    Authorization: token ? `Bearer ${token}` : "",
+  },
         body: JSON.stringify({
           conversationId,
           callerId: currentUser?._id,
           type,
         }),
       });
+
+      if (await handleUnauthorized(callRes)) return;
 
       const callResult = await callRes.json();
 
@@ -154,18 +200,22 @@ export default function Sidebar({
   }
 
   async function startDirectChat(receiverId) {
+    const token = localStorage.getItem("token");  
     try {
       const res = await fetch("/api/conversations", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+ headers: {
+    "Content-Type": "application/json",
+    Authorization: token ? `Bearer ${token}` : "",
+  },
         body: JSON.stringify({
           type: "direct",
           currentUserId: currentUser?._id,
           receiverId,
         }),
       });
+
+      if (await handleUnauthorized(res)) return;
 
       const result = await res.json();
 
@@ -213,8 +263,13 @@ export default function Sidebar({
 
     const res = await fetch(
       `/api/conversations?conversationId=${conversationId}&userId=${currentUser?._id}`,
-      { method: "DELETE" }
+      {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      }
     );
+
+    if (await handleUnauthorized(res)) return;
 
     const result = await res.json();
 
@@ -249,7 +304,10 @@ export default function Sidebar({
 
       const res = await fetch(`/api/profile?userId=${user?._id}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
       });
+
+      if (await handleUnauthorized(res)) return;
 
       const result = await res.json();
 
@@ -306,16 +364,18 @@ export default function Sidebar({
   }
 
   async function handleConversationClick(conversation) {
-    await fetch("/api/messages/read", {
+    const res = await fetch("/api/messages/read", {
       method: "POST",
-      headers: {
+      headers: getAuthHeaders({
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({
         conversationId: conversation?._id,
         userId: currentUser?._id,
       }),
     });
+
+    if (await handleUnauthorized(res)) return;
 
     onSelectConversation(conversation);
     setMobileChatOpen?.(true);
@@ -365,7 +425,10 @@ export default function Sidebar({
               {getConversationName(conversation)}
             </div>
 
-            <div className="text-secondary text-truncate" style={{ fontSize: 13 }}>
+            <div
+              className="text-secondary text-truncate"
+              style={{ fontSize: 13 }}
+            >
               {lastMessageText}
             </div>
           </div>
@@ -391,10 +454,7 @@ export default function Sidebar({
           </div>
         </button>
 
-        <div
-          ref={isMenuOpen ? chatMenuRef : null}
-          className="position-relative"
-        >
+        <div ref={isMenuOpen ? chatMenuRef : null} className="position-relative">
           <button
             type="button"
             onClick={(e) => {

@@ -15,10 +15,11 @@ export default function PushNotificationRegister({ currentUser }) {
       if (!token) return;
 
       await fetch("/api/push-token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        method: "POST", 
+ headers: {
+    "Content-Type": "application/json",
+    Authorization: token ? `Bearer ${token}` : "",
+  },
         body: JSON.stringify({
           userId: currentUser._id,
           token,

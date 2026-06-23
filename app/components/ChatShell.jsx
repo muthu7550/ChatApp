@@ -14,10 +14,14 @@ export default function ChatShell() {
       const userId = user?._id;
 
       if (!userId) return;
+      const token = localStorage.getItem("token");
 
       const res = await fetch("/api/conversations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+    "Content-Type": "application/json",
+    Authorization: token ? `Bearer ${token}` : "",
+  },
         body: JSON.stringify({ userId }),
       });
 

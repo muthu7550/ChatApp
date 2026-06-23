@@ -27,9 +27,13 @@ export default function NetworkModal({
   async function fetchUsers(searchText = "") {
     try {
       setLoading(true);
-
+const token = localStorage.getItem("token");
       const res = await fetch(
-        `/api/users?userId=${currentUser?._id}&search=${searchText}`
+        `/api/users?userId=${currentUser?._id}&search=${searchText}`,{
+           headers: {
+    Authorization: token ? `Bearer ${token}` : "",
+  },
+        }
       );
 
       const result = await res.json();

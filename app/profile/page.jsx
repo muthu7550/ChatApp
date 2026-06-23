@@ -74,9 +74,12 @@ export default function ProfilePage() {
 
       const formData = new FormData();
       formData.append("file", file);
-
+      const token = localStorage.getItem("token");
       const res = await fetch("/api/upload", {
         method: "POST",
+         headers: {
+    Authorization: token ? `Bearer ${token}` : "",
+  },
         body: formData,
       });
 
@@ -104,10 +107,14 @@ export default function ProfilePage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    const token = localStorage.getItem("token");
 
     const res = await fetch("/api/profile", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+       headers: {
+    "Content-Type": "application/json",
+    Authorization: token ? `Bearer ${token}` : "",
+  },
       body: JSON.stringify({
         userId: user?._id,
         name: form?.name,

@@ -59,9 +59,12 @@ export default function Composer({ onSend, currentUser }) {
 
       const formData = new FormData();
       formData.append("file", file);
-
+  const token = localStorage.getItem("token");
       const res = await fetch("/api/upload", {
         method: "POST",
+         headers: {
+    Authorization: token ? `Bearer ${token}` : "",
+  },
         body: formData,
       });
 
@@ -214,7 +217,7 @@ export default function Composer({ onSend, currentUser }) {
           <button
             type="button"
             onClick={handleSend}
-            disabled={uploading|| !text}
+            disabled={!pendingFile && !text}
             className="btn btn-success rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center"
             style={{ width: 44, height: 44 }}
           >
