@@ -487,3 +487,42 @@ button.rounded-circle {
   }
 }
 
+.file-card-pro {
+  margin-top: 8px;
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.22);
+}
+
+.message-bubble-pro.other .file-card-pro {
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+}
+
+.file-icon-pro {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 20px;
+  background: rgba(255,255,255,.22);
+}
+
+.message-bubble-pro.other .file-icon-pro {
+  background: #fff3eb;
+  color: #ff5b2f;
+}
+
+.file-title-pro {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.file-subtitle-pro {
+  font-size: 12px;
+  opacity: .7;
+}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Sidebar from "./Sidebar";
 import ChatWindow from "./ChatWindow";
 import IncomingCallWatcher from "./IncomingCallWatcher";
@@ -10,6 +10,7 @@ import PushNotificationRegister from "./PushNotificationRegister";
 import { requestNotificationPermission } from "../lib/notifyClient";
 
 export default function ChatLayout() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const urlConversationId = searchParams.get("conversationId");
 
@@ -24,19 +25,38 @@ export default function ChatLayout() {
 
     if (!token || !user?._id) {
       document.cookie = "token=; path=/; max-age=0";
-      window.location.href = "/login";
+      router.replace("/login");
       return;
     }
 
     setCurrentUser(user);
     requestNotificationPermission();
-  }, []);
+  }, [router]);
 
-  useEffect(() => {
-    async function loadConversationFromUrl() {
-      if (!urlConversationId || !currentUser?._id) return;
+  const loadConversationFromUrl = useCallback(async () => {
+    if (!urlConversationId || !currentUser?._id) {
+      setSelectedConversation(null);
+      setMobileChatOpen(false);
+      return;
+    }
 
-      const res = await fetch(`/api/conversations?userId=${currentUser._id}`);
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`/api/conversations?userId=${currentUser._id}`, {
+        cache: "no-store",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+
+      if (res.status === 401) {
+        localStorage.clear();
+        document.cookie = "token=; path=/; max-age=0";
+        router.replace("/login");
+        return;
+      }
+
       const result = await res.json();
 
       const matchedConversation = result?.conversations?.find(
@@ -46,11 +66,38 @@ export default function ChatLayout() {
       if (matchedConversation) {
         setSelectedConversation(matchedConversation);
         setMobileChatOpen(true);
+      } else {
+        setSelectedConversation(null);
+        setMobileChatOpen(false);
       }
+    } catch (error) {
+      console.error("Load conversation from URL error:", error);
     }
+  }, [urlConversationId, currentUser?._id, router]);
 
+  useEffect(() => {
     loadConversationFromUrl();
-  }, [urlConversationId, currentUser?._id]);
+  }, [loadConversationFromUrl, refreshKey]);
+
+  function handleSelectConversation(conversation) {
+    if (!conversation?._id) return;
+
+    setSelectedConversation(conversation);
+    setMobileChatOpen(true);
+
+    router.push(`/chat?conversationId=${conversation._id}`);
+  }
+
+  function handleBack() {
+    setSelectedConversation(null);
+    setMobileChatOpen(false);
+    router.push("/chat");
+  }
+
+  function handleRefresh() {
+    setRefreshKey((prev) => prev + 1);
+    router.refresh();
+  }
 
   return (
     <div className="sunday-page">
@@ -59,7 +106,7 @@ export default function ChatLayout() {
           <IncomingCallWatcher currentUser={currentUser} />
           <IncomingMessageWatcher
             currentUser={currentUser}
-            onRefresh={() => setRefreshKey((prev) => prev + 1)}
+            onRefresh={handleRefresh}
           />
           <PushNotificationRegister currentUser={currentUser} />
         </>
@@ -88,12 +135,9 @@ export default function ChatLayout() {
               currentUser={currentUser}
               selectedConversation={selectedConversation}
               refreshKey={refreshKey}
-              onRefresh={() => setRefreshKey((prev) => prev + 1)}
+              onRefresh={handleRefresh}
               setMobileChatOpen={setMobileChatOpen}
-              onSelectConversation={(conversation) => {
-                setSelectedConversation(conversation);
-                setMobileChatOpen(true);
-              }}
+              onSelectConversation={handleSelectConversation}
             />
           </aside>
 
@@ -103,12 +147,11 @@ export default function ChatLayout() {
             }`}
           >
             <ChatWindow
+              key={selectedConversation?._id || "empty-chat"}
               currentUser={currentUser}
               conversation={selectedConversation}
-              onRefreshConversations={() =>
-                setRefreshKey((prev) => prev + 1)
-              }
-              onBack={() => setMobileChatOpen(false)}
+              onRefreshConversations={handleRefresh}
+              onBack={handleBack}
             />
           </main>
         </div>

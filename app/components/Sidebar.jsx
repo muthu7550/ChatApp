@@ -654,7 +654,7 @@ export default function Sidebar({
       </header>
 
       <div className="px-3 py-3 sidebar-search-wrap">
-        <div className="input-group sidebar-search">
+        <div className="input-group sidebar-search border border-1 rounded">
           <span className="input-group-text">
             <FaSearch />
           </span>

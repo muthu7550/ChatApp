@@ -471,42 +471,49 @@ function MessageSkeleton() {
 function EmptyChat({ onQuickMessage, title }) {
   return (
     <div className="h-100 d-flex align-items-center justify-content-center text-center px-3">
-      <div className="empty-chat-card">
-        <div className="empty-chat-icon">
+      <div className="empty-chat-card bg-white rounded-[28px] shadow-lg border border-gray-100 px-4 py-5">
+        <div
+          className="mx-auto mb-4 rounded-circle d-flex align-items-center justify-content-center text-white"
+          style={{
+            width: 86,
+            height: 86,
+            background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
+            boxShadow: "0 18px 35px rgba(255, 91, 47, 0.28)",
+            fontSize: 34,
+          }}
+        >
           <FaCommentDots />
         </div>
 
         <h3 className="text-dark fw-bold mb-2">No Messages Yet</h3>
 
-        <p className="text-secondary mb-4">
+        <p className="text-secondary mb-4 mx-auto" style={{ maxWidth: 360 }}>
           Start a conversation with{" "}
-          <span className="text-success fw-bold">{title}</span>.
+          <span style={{ color: "#ff5b2f" }} className="fw-bold">
+            {title}
+          </span>
+          .
         </p>
 
         <div className="d-flex flex-wrap justify-content-center gap-2">
-          <button
-            type="button"
-            onClick={() => onQuickMessage("👋 Hello")}
-            className="btn  rounded-pill px-3"
-          >
-            👋 Hello
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onQuickMessage("😊 How are you?")}
-            className="btn  rounded-pill px-3"
-          >
-            😊 How are you?
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onQuickMessage("🎉 Welcome")}
-            className="btn  rounded-pill px-3"
-          >
-            🎉 Welcome
-          </button>
+          {[
+            "👋 Hello",
+            "😊 How are you?",
+            "🎉 Welcome",
+          ].map((message) => (
+            <button
+              key={message}
+              type="button"
+              onClick={() => onQuickMessage(message)}
+              className="btn rounded-pill px-4 py-2 fw-semibold border-0"
+              style={{
+                background: "#fff3eb",
+                color: "#ff5b2f",
+              }}
+            >
+              {message}
+            </button>
+          ))}
         </div>
       </div>
     </div>
