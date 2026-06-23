@@ -34,10 +34,14 @@ export default function CreateGroupModal({
 
   const filteredUsers = useMemo(() => {
     const value = search.toLowerCase().trim();
-    return users.filter((user) => user?.name?.toLowerCase().includes(value));
+    return users.filter((user) =>
+      user?.name?.toLowerCase().includes(value)
+    );
   }, [users, search]);
 
   function toggleUser(userId) {
+    if (!userId) return;
+
     setSelectedUsers((prev) =>
       prev.includes(userId)
         ? prev.filter((id) => id !== userId)
@@ -165,16 +169,16 @@ export default function CreateGroupModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/35 backdrop-blur-sm px-4">
-      <div className="w-full max-w-[760px] max-h-[90vh] overflow-hidden rounded-[28px] bg-white shadow-2xl border border-gray-100 d-flex flex-column">
-        <header className="d-flex align-items-center justify-content-between px-4 px-sm-5 py-4 border-bottom bg-white">
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/35 backdrop-blur-sm px-0 sm:px-4">
+      <div className="w-full sm:max-w-[760px] h-[94vh] sm:h-auto sm:max-h-[90vh] overflow-hidden rounded-t-[28px] sm:rounded-[28px] bg-white shadow-2xl border border-gray-100 d-flex flex-column">
+        <header className="d-flex align-items-center justify-content-between px-3 px-sm-5 py-3 py-sm-4 border-bottom bg-white">
           <div className="d-flex align-items-center gap-3 min-w-0">
-            <div className="h-12 w-12 rounded-2xl bg-orange-50 text-orange-500 d-flex align-items-center justify-content-center">
+            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-orange-50 text-orange-500 d-flex align-items-center justify-content-center flex-shrink-0">
               <FaUsers size={20} />
             </div>
 
             <div className="min-w-0">
-              <h4 className="mb-0 fw-bold text-gray-900 text-truncate">
+              <h4 className="mb-0 fw-bold text-gray-900 text-truncate text-base sm:text-xl">
                 Create Group
               </h4>
               <small className="text-gray-500">
@@ -186,15 +190,15 @@ export default function CreateGroupModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 d-flex align-items-center justify-content-center border-0"
+            className="h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 d-flex align-items-center justify-content-center border-0 flex-shrink-0"
           >
             <FaTimes />
           </button>
         </header>
 
-        <div className="overflow-auto p-4 p-sm-5 bg-[#fafafa] flex-grow-1">
-          <div className="bg-white rounded-[22px] p-4 shadow-sm border border-gray-100 mb-4">
-            <div className="d-flex align-items-center gap-4">
+        <div className="overflow-auto p-3 p-sm-5 bg-[#fafafa] flex-grow-1">
+          <div className="bg-white rounded-[22px] p-3 p-sm-4 shadow-sm border border-gray-100 mb-3 mb-sm-4">
+            <div className="d-flex flex-column flex-sm-row align-items-center gap-3 gap-sm-4">
               <div className="position-relative flex-shrink-0">
                 <img
                   src={getGroupAvatar()}
@@ -216,7 +220,7 @@ export default function CreateGroupModal({
                 </label>
               </div>
 
-              <div className="flex-grow-1 min-w-0">
+              <div className="flex-grow-1 min-w-0 w-100">
                 <label className="form-label small fw-semibold text-gray-600 mb-2">
                   Group name
                 </label>
@@ -229,28 +233,30 @@ export default function CreateGroupModal({
                   className="form-control border-0 bg-gray-100 rounded-pill px-4 py-3 text-gray-800 shadow-none"
                 />
 
-                <small className="text-gray-400 d-block mt-2">
-                  {uploading ? "Uploading image..." : "Add a clear name and photo"}
+                <small className="text-gray-400 d-block mt-2 text-center text-sm-start">
+                  {uploading
+                    ? "Uploading image..."
+                    : "Add a clear name and photo"}
                 </small>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-[22px] p-4 shadow-sm border border-gray-100">
+          <div className="bg-white rounded-[22px] p-3 p-sm-4 shadow-sm border border-gray-100">
             <div className="d-flex align-items-center justify-content-between mb-3">
-              <div>
+              <div className="min-w-0">
                 <h6 className="mb-0 fw-bold text-gray-900">Add Members</h6>
                 <small className="text-gray-500">
                   Choose users for this group
                 </small>
               </div>
 
-              <div className="h-9 w-9 rounded-full bg-orange-50 text-orange-500 d-flex align-items-center justify-content-center">
+              <div className="h-9 w-9 rounded-full bg-orange-50 text-orange-500 d-flex align-items-center justify-content-center flex-shrink-0">
                 <FaUserPlus size={14} />
               </div>
             </div>
 
-            <div className="position-relative mb-4">
+            <div className="position-relative mb-3 mb-sm-4">
               <FaSearch className="position-absolute top-50 start-0 translate-middle-y ms-4 text-gray-400" />
 
               <input
@@ -262,7 +268,7 @@ export default function CreateGroupModal({
             </div>
 
             {selectedUsers.length > 0 && (
-              <div className="d-flex gap-3 overflow-auto pb-4 mb-3">
+              <div className="d-flex gap-3 overflow-auto pb-3 mb-3">
                 {selectedUsers.map((id) => {
                   const user = users.find((item) => item?._id === id);
 
@@ -297,7 +303,7 @@ export default function CreateGroupModal({
               </div>
             )}
 
-            <div className="d-flex flex-column gap-2 max-h-[300px] overflow-auto pe-1">
+            <div className="d-flex flex-column gap-2 max-h-[42vh] sm:max-h-[300px] overflow-auto pe-1">
               {filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => {
                   const selected = selectedUsers.includes(user?._id);
@@ -316,8 +322,8 @@ export default function CreateGroupModal({
                       <img
                         src={getAvatar(user)}
                         className="rounded-circle object-fit-cover flex-shrink-0"
-                        width="50"
-                        height="50"
+                        width="48"
+                        height="48"
                         alt={user?.name || "user"}
                       />
 
@@ -353,12 +359,12 @@ export default function CreateGroupModal({
           </div>
         </div>
 
-        <footer className="bg-white px-4 px-sm-5 py-4 border-top d-flex gap-3">
+        <footer className="bg-white px-3 px-sm-5 py-3 py-sm-4 border-top d-flex flex-column flex-sm-row gap-2 gap-sm-3">
           <button
             type="button"
             onClick={onClose}
             disabled={creating}
-            className="btn rounded-pill flex-fill py-3 fw-semibold bg-gray-100 text-gray-700 border-0"
+            className="btn rounded-pill flex-fill py-3 fw-semibold bg-gray-100 text-gray-700 border-0 order-2 order-sm-1"
           >
             Cancel
           </button>
@@ -367,7 +373,7 @@ export default function CreateGroupModal({
             type="button"
             onClick={createGroup}
             disabled={creating || uploading}
-            className="btn rounded-pill flex-fill py-3 fw-bold text-white border-0 shadow-sm"
+            className="btn rounded-pill flex-fill py-3 fw-bold text-white border-0 shadow-sm order-1 order-sm-2"
             style={{
               background: "linear-gradient(135deg, #ff9f43, #ff5c2a)",
             }}
@@ -393,7 +399,7 @@ export default function CreateGroupModal({
             />
           </div>
 
-          <div className="bg-white p-4">
+          <div className="bg-white p-3 p-sm-4">
             <input
               type="range"
               min={1}
@@ -404,14 +410,14 @@ export default function CreateGroupModal({
               className="form-range"
             />
 
-            <div className="d-flex gap-3">
+            <div className="d-flex flex-column flex-sm-row gap-2 gap-sm-3">
               <button
                 type="button"
                 onClick={() => {
                   setShowCropper(false);
                   setImageSrc(null);
                 }}
-                className="btn bg-gray-100 rounded-pill flex-fill py-3 fw-semibold"
+                className="btn bg-gray-100 rounded-pill flex-fill py-3 fw-semibold order-2 order-sm-1"
               >
                 Cancel
               </button>
@@ -419,7 +425,8 @@ export default function CreateGroupModal({
               <button
                 type="button"
                 onClick={uploadCroppedImage}
-                className="btn rounded-pill flex-fill py-3 fw-bold text-white border-0"
+                disabled={uploading}
+                className="btn rounded-pill flex-fill py-3 fw-bold text-white border-0 order-1 order-sm-2"
                 style={{
                   background: "linear-gradient(135deg, #ff9f43, #ff5c2a)",
                 }}

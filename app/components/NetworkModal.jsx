@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FaComments,
+  FaEllipsisV,
   FaMicrophone,
   FaSearch,
   FaTimes,
@@ -19,9 +20,20 @@ export default function NetworkModal({
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const debounceRef = useRef(null);
 
   useEffect(() => {
     fetchUsers("");
+  }, []);
+
+  useEffect(() => {
+    function handleClick() {
+      setOpenMenuId(null);
+    }
+
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
   }, []);
 
   async function fetchUsers(searchText = "") {
@@ -31,7 +43,9 @@ export default function NetworkModal({
       const token = localStorage.getItem("token");
 
       const res = await fetch(
-        `/api/users?userId=${currentUser?._id}&search=${searchText}`,
+        `/api/users?userId=${currentUser?._id || ""}&search=${encodeURIComponent(
+          searchText
+        )}`,
         {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
@@ -49,6 +63,15 @@ export default function NetworkModal({
     }
   }
 
+  function handleSearch(value) {
+    setSearch(value);
+
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchUsers(value);
+    }, 350);
+  }
+
   function getAvatar(user) {
     return (
       user?.avatar ||
@@ -58,20 +81,30 @@ export default function NetworkModal({
     );
   }
 
+  function goToChat(userId) {
+    if (!userId) return;
+    onStartChat(userId);
+  }
+
+  function startCall(userId, type) {
+    if (!userId) return;
+    onStartCall(userId, type);
+  }
+
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/35 backdrop-blur-sm px-4">
-      <div className="w-full max-w-[720px] max-h-[90vh] overflow-hidden rounded-[28px] bg-white shadow-2xl border border-gray-100 d-flex flex-column">
-        <header className="d-flex align-items-center justify-content-between px-4 px-sm-5 py-4 border-bottom bg-white">
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/35 backdrop-blur-sm px-0 sm:px-4">
+      <div className="w-full sm:max-w-[720px] h-[92vh] sm:h-auto sm:max-h-[90vh] overflow-hidden rounded-t-[28px] sm:rounded-[28px] bg-white shadow-2xl border border-gray-100 d-flex flex-column">
+        <header className="d-flex align-items-center justify-content-between px-3 px-sm-5 py-3 py-sm-4 border-bottom bg-white">
           <div className="d-flex align-items-center gap-3 min-w-0">
-            <div className="h-12 w-12 rounded-2xl bg-orange-50 text-orange-500 d-flex align-items-center justify-content-center">
+            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-orange-50 text-orange-500 d-flex align-items-center justify-content-center flex-shrink-0">
               <FaUserFriends size={20} />
             </div>
 
             <div className="min-w-0">
-              <h4 className="mb-0 fw-bold text-gray-900 text-truncate">
+              <h4 className="mb-0 fw-bold text-gray-900 text-truncate text-base sm:text-xl">
                 Our Network
               </h4>
-              <small className="text-gray-500">
+              <small className="text-gray-500 d-none d-sm-block">
                 Search users and connect instantly
               </small>
             </div>
@@ -80,30 +113,26 @@ export default function NetworkModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 d-flex align-items-center justify-content-center border-0 transition"
+            className="h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 d-flex align-items-center justify-content-center border-0 transition flex-shrink-0"
           >
             <FaTimes />
           </button>
         </header>
 
-        <div className="px-4 px-sm-5 py-4 bg-[#fafafa] border-bottom">
+        <div className="px-3 px-sm-5 py-3 py-sm-4 bg-[#fafafa] border-bottom">
           <div className="position-relative">
             <FaSearch className="position-absolute top-50 start-0 translate-middle-y ms-4 text-gray-400" />
 
             <input
               value={search}
-              onChange={(e) => {
-                const value = e.target.value;
-                setSearch(value);
-                fetchUsers(value);
-              }}
+              onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search user by name..."
               className="form-control border-0 bg-white rounded-pill ps-5 py-3 text-gray-800 shadow-sm"
             />
           </div>
         </div>
 
-        <div className="overflow-auto p-4 p-sm-5 bg-[#fafafa] flex-grow-1">
+        <div className="overflow-auto p-3 p-sm-5 bg-[#fafafa] flex-grow-1">
           {loading ? (
             <NetworkSkeleton />
           ) : users.length > 0 ? (
@@ -111,30 +140,35 @@ export default function NetworkModal({
               {users.map((user) => (
                 <div
                   key={user?._id}
-                  className="d-flex align-items-center gap-3 rounded-[22px] bg-white p-3 shadow-sm border border-gray-100 hover:bg-gray-50 transition"
+                  className="position-relative d-flex align-items-center gap-3 rounded-[22px] bg-white p-3 shadow-sm border border-gray-100 hover:bg-gray-50 transition"
                 >
-                  <img
-                    src={getAvatar(user)}
-                    className="rounded-circle object-fit-cover flex-shrink-0"
-                    width="54"
-                    height="54"
-                    alt={user?.name || "user"}
-                  />
+                  <div
+                    onClick={() => goToChat(user?._id)}
+                    className="d-flex align-items-center gap-3 flex-grow-1 overflow-hidden cursor-pointer"
+                  >
+                    <img
+                      src={getAvatar(user)}
+                      className="rounded-circle object-fit-cover flex-shrink-0"
+                      width="54"
+                      height="54"
+                      alt={user?.name || "user"}
+                    />
 
-                  <div className="flex-grow-1 overflow-hidden">
-                    <div className="fw-bold text-gray-900 text-truncate">
-                      {user?.name || "User"}
+                    <div className="flex-grow-1 overflow-hidden">
+                      <div className="fw-bold text-gray-900 text-truncate">
+                        {user?.name || "User"}
+                      </div>
+
+                      <small className="text-gray-500 d-block text-truncate">
+                        {user?.about || "Hey there! I am using ChatterBox 😂"}
+                      </small>
                     </div>
-
-                    <small className="text-gray-500 d-block text-truncate">
-                      {user?.about || "Hey there! I am using ChatterBox 😂"}
-                    </small>
                   </div>
 
-                  <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                  <div className="d-none d-sm-flex align-items-center gap-2 flex-shrink-0">
                     <button
                       type="button"
-                      onClick={() => onStartChat(user?._id)}
+                      onClick={() => goToChat(user?._id)}
                       className="h-10 w-10 rounded-full border-0 text-white d-flex align-items-center justify-content-center shadow-sm"
                       style={{
                         background: "linear-gradient(135deg, #ff9f43, #ff5c2a)",
@@ -146,7 +180,7 @@ export default function NetworkModal({
 
                     <button
                       type="button"
-                      onClick={() => onStartCall(user?._id, "audio")}
+                      onClick={() => startCall(user?._id, "audio")}
                       className="h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 border-0 d-flex align-items-center justify-content-center"
                       title="Audio Call"
                     >
@@ -155,12 +189,60 @@ export default function NetworkModal({
 
                     <button
                       type="button"
-                      onClick={() => onStartCall(user?._id, "video")}
+                      onClick={() => startCall(user?._id, "video")}
                       className="h-10 w-10 rounded-full bg-orange-50 hover:bg-orange-100 text-orange-500 border-0 d-flex align-items-center justify-content-center"
                       title="Video Call"
                     >
                       <FaVideo size={14} />
                     </button>
+                  </div>
+
+                  <div className="d-sm-none flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(openMenuId === user?._id ? null : user?._id);
+                      }}
+                      className="h-10 w-10 rounded-full bg-gray-100 text-gray-600 border-0 d-flex align-items-center justify-content-center"
+                    >
+                      <FaEllipsisV size={14} />
+                    </button>
+
+                    {openMenuId === user?._id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="position-absolute end-0 top-100 mt-2 me-3 bg-white rounded-3 shadow-lg border border-gray-100 overflow-hidden z-[10000]"
+                        style={{ minWidth: 150 }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => goToChat(user?._id)}
+                          className="w-100 border-0 bg-white px-3 py-2 d-flex align-items-center gap-2 text-gray-700"
+                        >
+                          <FaComments className="text-orange-500" />
+                          Chat
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => startCall(user?._id, "audio")}
+                          className="w-100 border-0 bg-white px-3 py-2 d-flex align-items-center gap-2 text-gray-700"
+                        >
+                          <FaMicrophone />
+                          Audio
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => startCall(user?._id, "video")}
+                          className="w-100 border-0 bg-white px-3 py-2 d-flex align-items-center gap-2 text-gray-700"
+                        >
+                          <FaVideo className="text-orange-500" />
+                          Video
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -187,7 +269,7 @@ function NetworkSkeleton() {
           className="d-flex align-items-center gap-3 rounded-[22px] bg-white p-3 shadow-sm border border-gray-100"
         >
           <div
-            className="rounded-circle bg-gray-200"
+            className="rounded-circle bg-gray-200 flex-shrink-0"
             style={{ width: 54, height: 54 }}
           />
 
