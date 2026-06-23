@@ -59,7 +59,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 flex items-center justify-center text-white px-4">
+    <main className="min-h-screen bg-zinc-950 flex items-center justify-center text-dark px-4">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-md bg-zinc-900 p-8 rounded-3xl space-y-4 shadow-2xl"

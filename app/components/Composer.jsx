@@ -14,6 +14,7 @@ import {
 
 const MAX_FILE_SIZE_MB = 4;
 const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
+const ORANGE_GRADIENT = "linear-gradient(135deg, #ff9d2e, #ff5b2f)";
 
 export default function Composer({ onSend, currentUser }) {
   const [text, setText] = useState("");
@@ -44,15 +45,16 @@ export default function Composer({ onSend, currentUser }) {
     if (!currentUser?._id) return alert("Please login again");
     if (!text.trim() && !pendingFile) return;
 
+    const messageText = text.trim();
+
     setText("");
 
     await onSend({
-      text: text.trim(),
+      text: messageText,
       attachments: pendingFile ? [pendingFile] : [],
       location: null,
     });
 
-    setText("");
     setPendingFile(null);
   }
 
@@ -143,28 +145,148 @@ export default function Composer({ onSend, currentUser }) {
   }
 
   return (
-    <div className="bg-[#202c33] border-top border-secondary position-relative">
+    <div className="composer-shell bg-white border-top position-relative">
+      <style>{`
+        .composer-shell {
+          box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.04);
+        }
+
+        .composer-icon-btn {
+          width: 44px;
+          height: 44px;
+          border: 0;
+          border-radius: 999px;
+          background: #f4f4f5;
+          color: #64748b;
+          transition: 0.18s ease;
+        }
+
+        .composer-icon-btn:hover {
+          background: #fff3eb;
+          color: #ff5b2f;
+        }
+
+        .composer-send-btn {
+          width: 46px;
+          height: 46px;
+          border: 0;
+          border-radius: 999px;
+          background: ${ORANGE_GRADIENT};
+          color: #fff;
+          box-shadow: 0 10px 24px rgba(255, 91, 47, 0.28);
+          transition: 0.18s ease;
+        }
+
+        .composer-send-btn:disabled {
+          opacity: 0.45;
+          box-shadow: none;
+          cursor: not-allowed;
+        }
+
+        .composer-input {
+          min-height: 46px;
+          max-height: 110px;
+          resize: none;
+          border: 0 !important;
+          border-radius: 999px !important;
+          background: #f5f5f5 !important;
+          color: #111827 !important;
+          box-shadow: none !important;
+        }
+
+        .composer-input:focus {
+          background: #f3f4f6 !important;
+          box-shadow: 0 0 0 3px rgba(255, 107, 44, 0.12) !important;
+        }
+
+        .attach-popover {
+          width: 250px;
+          z-index: 9999;
+          background: #ffffff;
+          border: 1px solid #f1f1f1;
+          border-radius: 22px;
+          box-shadow: 0 18px 50px rgba(15, 23, 42, 0.18);
+          overflow: hidden;
+        }
+
+        .attach-popover::after {
+          content: "";
+          position: absolute;
+          bottom: -7px;
+          left: 24px;
+          width: 14px;
+          height: 14px;
+          background: #ffffff;
+          transform: rotate(45deg);
+          border-right: 1px solid #f1f1f1;
+          border-bottom: 1px solid #f1f1f1;
+        }
+
+        .attach-item {
+          width: 100%;
+          border: 0;
+          background: #ffffff;
+          padding: 14px 18px;
+          color: #334155;
+          font-weight: 600;
+          transition: 0.18s ease;
+          cursor: pointer;
+        }
+
+        .attach-item:hover {
+          background: #fff4ec;
+          color: #ff5b2f;
+        }
+
+        .attach-icon {
+          width: 34px;
+          height: 34px;
+          border-radius: 999px;
+          background: #fff3eb;
+          color: #ff5b2f;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .pending-card {
+          background: #fff7f1;
+          border: 1px solid #ffe0cf;
+          border-radius: 22px;
+        }
+
+        .error-modal-card {
+          background: #ffffff;
+          color: #111827;
+          border-radius: 26px;
+          box-shadow: 0 24px 70px rgba(0,0,0,.25);
+        }
+      `}</style>
+
       {largeFileError && (
         <div
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center px-3"
           style={{
-            background: "rgba(0,0,0,0.75)",
+            background: "rgba(0,0,0,0.45)",
+            backdropFilter: "blur(6px)",
             zIndex: 99999,
           }}
         >
           <div
-            className="bg-dark text-white rounded-4 shadow-lg text-center p-4"
+            className="error-modal-card text-center p-4"
             style={{
-              width: "90%",
+              width: "100%",
               maxWidth: 420,
             }}
           >
             <div
-              className="mx-auto rounded-circle d-flex align-items-center justify-content-center bg-danger bg-opacity-25 text-danger mb-3"
+              className="mx-auto rounded-circle d-flex align-items-center justify-content-center text-danger mb-3"
               style={{
                 width: 72,
                 height: 72,
-                fontSize: 34,
+                fontSize: 32,
+                background: "#fff1f2",
               }}
             >
               <FaExclamationTriangle />
@@ -177,14 +299,15 @@ export default function Composer({ onSend, currentUser }) {
               is {largeFileError.max} MB.
             </p>
 
-            <div className="bg-black bg-opacity-25 rounded-3 p-2 mb-3 text-truncate small text-secondary">
+            <div className="bg-light rounded-4 p-3 mb-3 text-truncate small text-secondary">
               {largeFileError.name}
             </div>
 
             <button
               type="button"
               onClick={() => setLargeFileError(null)}
-              className="btn btn-success w-100 rounded-3 fw-bold"
+              className="btn w-100 rounded-pill py-3 fw-bold text-white border-0"
+              style={{ background: ORANGE_GRADIENT }}
             >
               Choose Smaller File
             </button>
@@ -193,19 +316,24 @@ export default function Composer({ onSend, currentUser }) {
       )}
 
       {uploading && (
-        <div className="px-3 px-sm-4 py-3 d-flex align-items-center gap-3 border-bottom border-secondary">
-          <div className="spinner-border spinner-border-sm text-success" />
-          <span className="small fw-semibold text-white">Uploading file...</span>
+        <div className="px-3 px-sm-4 py-3 d-flex align-items-center gap-3 border-bottom bg-white">
+          <div
+            className="spinner-border spinner-border-sm"
+            style={{ color: "#ff5b2f" }}
+          />
+          <span className="small fw-semibold text-secondary">
+            Uploading file...
+          </span>
         </div>
       )}
 
       {pendingFile && !uploading && (
-        <div className="px-3 px-sm-4 py-3 border-bottom border-secondary">
-          <div className="bg-[#111b21] rounded-4 p-3 d-flex align-items-center gap-3 shadow-sm">
+        <div className="px-3 px-sm-4 pt-3">
+          <div className="pending-card p-3 d-flex align-items-center gap-3 shadow-sm">
             {pendingFile?.type === "image" ? (
               <img
                 src={pendingFile?.url}
-                className="rounded-3 object-fit-cover"
+                className="rounded-4 object-fit-cover"
                 width="58"
                 height="58"
                 alt={pendingFile?.name}
@@ -213,21 +341,21 @@ export default function Composer({ onSend, currentUser }) {
             ) : pendingFile?.type === "video" ? (
               <video
                 src={pendingFile?.url}
-                className="rounded-3 object-fit-cover"
+                className="rounded-4 object-fit-cover"
                 width="58"
                 height="58"
               />
             ) : (
               <div
-                className="rounded-3 bg-dark d-flex align-items-center justify-content-center"
+                className="rounded-4 bg-white d-flex align-items-center justify-content-center"
                 style={{ width: 58, height: 58 }}
               >
-                <FaFileAlt className="text-success fs-4" />
+                <FaFileAlt style={{ color: "#ff5b2f", fontSize: 24 }} />
               </div>
             )}
 
             <div className="flex-grow-1 overflow-hidden">
-              <div className="fw-bold text-white text-truncate">
+              <div className="fw-bold text-dark text-truncate">
                 {pendingFile?.name}
               </div>
               <small className="text-secondary">Ready to send</small>
@@ -236,8 +364,12 @@ export default function Composer({ onSend, currentUser }) {
             <button
               type="button"
               onClick={() => setPendingFile(null)}
-              className="btn btn-danger rounded-circle d-flex align-items-center justify-content-center"
-              style={{ width: 34, height: 34 }}
+              className="btn rounded-circle d-flex align-items-center justify-content-center text-white border-0"
+              style={{
+                width: 34,
+                height: 34,
+                background: "#ef4444",
+              }}
             >
               <FaTimes size={13} />
             </button>
@@ -245,12 +377,9 @@ export default function Composer({ onSend, currentUser }) {
         </div>
       )}
 
-      <div ref={attachRef}>
+      <div ref={attachRef} className="position-relative">
         {showAttachMenu && (
-          <div
-            className="position-absolute start-0 bottom-100 ms-2 ms-sm-4 mb-2 bg-dark border border-secondary rounded-4 shadow-lg overflow-hidden"
-            style={{ width: 240, zIndex: 9999 }}
-          >
+          <div className="attach-popover position-absolute start-0 bottom-100 ms-2 ms-sm-4 mb-3">
             <AttachItem
               icon={<FaImage />}
               label="Image / Video"
@@ -258,6 +387,7 @@ export default function Composer({ onSend, currentUser }) {
               onChange={handleFileUpload}
               disabled={uploading}
             />
+
             <AttachItem
               icon={<FaFileAlt />}
               label="Document"
@@ -265,6 +395,7 @@ export default function Composer({ onSend, currentUser }) {
               onChange={handleFileUpload}
               disabled={uploading}
             />
+
             <AttachItem
               icon={<FaMicrophone />}
               label="Audio"
@@ -276,21 +407,22 @@ export default function Composer({ onSend, currentUser }) {
             <button
               type="button"
               onClick={sendLocation}
-              className="btn btn-dark w-100 border-0 rounded-0 text-start px-4 py-3 d-flex align-items-center gap-3"
+              className="attach-item d-flex align-items-center gap-3 text-start"
             >
-              <FaLocationArrow className="text-success" />
+              <span className="attach-icon">
+                <FaLocationArrow />
+              </span>
               <span>Location</span>
             </button>
           </div>
         )}
 
-        <footer className="px-2 px-sm-4 py-2 py-sm-3 d-flex align-items-end gap-2">
+        <footer className="px-2 px-sm-4 py-3 d-flex align-items-end gap-2">
           <button
             type="button"
             onClick={() => setShowAttachMenu((prev) => !prev)}
             disabled={uploading}
-            className="btn btn-dark rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center"
-            style={{ width: 44, height: 44 }}
+            className="composer-icon-btn flex-shrink-0 d-flex align-items-center justify-content-center"
           >
             <FaPlus />
           </button>
@@ -307,18 +439,16 @@ export default function Composer({ onSend, currentUser }) {
             disabled={uploading}
             rows={1}
             placeholder={pendingFile ? "Add a caption..." : "Type a message"}
-            className="form-control bg-dark text-white border-secondary rounded-4 px-3 py-2 flex-grow-1"
-            style={{ resize: "none", minHeight: 44, maxHeight: 110 }}
+            className="form-control composer-input px-4 py-2 flex-grow-1"
           />
 
           <button
             type="button"
             onClick={handleSend}
-            disabled={!pendingFile && !text}
-            className="btn btn-success rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center"
-            style={{ width: 44, height: 44 }}
+            disabled={!pendingFile && !text.trim()}
+            className="composer-send-btn flex-shrink-0 d-flex align-items-center justify-content-center"
           >
-            <FaPaperPlane />
+            <FaPaperPlane size={15} />
           </button>
         </footer>
       </div>
@@ -328,8 +458,8 @@ export default function Composer({ onSend, currentUser }) {
 
 function AttachItem({ icon, label, accept, onChange, disabled }) {
   return (
-    <label className="btn btn-dark w-100 border-0 rounded-0 text-start px-4 py-3 d-flex align-items-center gap-3">
-      <span className="text-success">{icon}</span>
+    <label className="attach-item d-flex align-items-center gap-3">
+      <span className="attach-icon">{icon}</span>
       <span>{label}</span>
       <input
         type="file"

@@ -16,6 +16,7 @@ import {
   FaTrashAlt,
   FaEllipsisV,
 } from "react-icons/fa";
+import { ChatAvatar } from "./Avatar";
 
 export default function Sidebar({
   currentUser,
@@ -29,7 +30,6 @@ export default function Sidebar({
 
   const [conversations, setConversations] = useState([]);
   const [users, setUsers] = useState([]);
-
   const [conversationsLoading, setConversationsLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(true);
 
@@ -46,9 +46,10 @@ export default function Sidebar({
   const privateChats = conversations?.filter((c) => c?.type === "direct");
   const groupChats = conversations?.filter((c) => c?.type === "group");
 
+  const orangeGradient = "linear-gradient(135deg, #ff9d2e, #ff5b2f)";
+
   function getAuthHeaders(extraHeaders = {}) {
     const token = localStorage.getItem("token");
-
     return {
       Authorization: token ? `Bearer ${token}` : "",
       ...extraHeaders,
@@ -56,33 +57,31 @@ export default function Sidebar({
   }
 
   async function handleUnauthorized(res) {
-if (res.status === 401) {
-  localStorage.clear();
-
-  localStorage.setItem(
-    "sessionMessage",
-    "Your session has expired. Please login again."
-  );
-
-  router.push("/login");
-  return;
-}
+    if (res.status === 401) {
+      localStorage.clear();
+      localStorage.setItem(
+        "sessionMessage",
+        "Your session has expired. Please login again.",
+      );
+      router.push("/login");
+      return true;
+    }
 
     return false;
   }
 
-useEffect(() => {
-  if (!currentUser?._id) return;
+  useEffect(() => {
+    if (!currentUser?._id) return;
 
-  fetchConversations(conversations.length === 0);
-  fetchUsers("", users.length === 0);
+    fetchConversations(conversations.length === 0);
+    fetchUsers("", users.length === 0);
 
-  const interval = setInterval(() => {
-    fetchConversations(false);
-  }, 5000);
+    const interval = setInterval(() => {
+      fetchConversations(false);
+    }, 5000);
 
-  return () => clearInterval(interval);
-}, [currentUser?._id, refreshKey]);
+    return () => clearInterval(interval);
+  }, [currentUser?._id, refreshKey]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -107,28 +106,27 @@ useEffect(() => {
     };
   }, []);
 
-async function fetchConversations(showLoader = false) {
-  try {
-    if (showLoader && conversations.length === 0) {
-      setConversationsLoading(true);
+  async function fetchConversations(showLoader = false) {
+    try {
+      if (showLoader && conversations.length === 0) {
+        setConversationsLoading(true);
+      }
+
+      const res = await fetch(`/api/conversations?userId=${currentUser?._id}`, {
+        headers: getAuthHeaders(),
+      });
+
+      if (await handleUnauthorized(res)) return;
+
+      const result = await res.json();
+      setConversations(result?.conversations || []);
+    } catch (error) {
+      console.error("Fetch conversations error:", error);
+      setConversations([]);
+    } finally {
+      if (showLoader) setConversationsLoading(false);
     }
-
-    const res = await fetch(`/api/conversations?userId=${currentUser?._id}`, {
-      headers: getAuthHeaders(),
-    });
-
-    if (await handleUnauthorized(res)) return;
-
-    const result = await res.json();
-
-    setConversations(result?.conversations || []);
-  } catch (error) {
-    console.error("Fetch conversations error:", error);
-    setConversations([]);
-  } finally {
-    if (showLoader) setConversationsLoading(false);
   }
-}
 
   async function fetchUsers(searchText = "", showLoader = false) {
     try {
@@ -138,7 +136,7 @@ async function fetchConversations(showLoader = false) {
         `/api/users?userId=${currentUser?._id}&search=${searchText}`,
         {
           headers: getAuthHeaders(),
-        }
+        },
       );
 
       if (await handleUnauthorized(res)) return;
@@ -154,14 +152,14 @@ async function fetchConversations(showLoader = false) {
   }
 
   async function startCallFromNetwork(receiverId, type) {
-
     const token = localStorage.getItem("token");
+
     const res = await fetch("/api/conversations", {
       method: "POST",
- headers: {
-    "Content-Type": "application/json",
-    Authorization: token ? `Bearer ${token}` : "",
-  },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
       body: JSON.stringify({
         type: "direct",
         currentUserId: currentUser?._id,
@@ -175,13 +173,13 @@ async function fetchConversations(showLoader = false) {
 
     if (result?.success) {
       const conversationId = result?.conversation?._id;
-const token = localStorage.getItem("token");  
+
       const callRes = await fetch("/api/calls", {
         method: "POST",
- headers: {
-    "Content-Type": "application/json",
-    Authorization: token ? `Bearer ${token}` : "",
-  },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
         body: JSON.stringify({
           conversationId,
           callerId: currentUser?._id,
@@ -203,14 +201,15 @@ const token = localStorage.getItem("token");
   }
 
   async function startDirectChat(receiverId) {
-    const token = localStorage.getItem("token");  
+    const token = localStorage.getItem("token");
+
     try {
       const res = await fetch("/api/conversations", {
         method: "POST",
- headers: {
-    "Content-Type": "application/json",
-    Authorization: token ? `Bearer ${token}` : "",
-  },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
         body: JSON.stringify({
           type: "direct",
           currentUserId: currentUser?._id,
@@ -231,14 +230,14 @@ const token = localStorage.getItem("token");
 
       setConversations((prev) => {
         const exists = prev.some(
-          (item) => item?._id === result?.conversation?._id
+          (item) => item?._id === result?.conversation?._id,
         );
 
         if (exists) {
           return prev.map((item) =>
             item?._id === result?.conversation?._id
               ? result?.conversation
-              : item
+              : item,
           );
         }
 
@@ -252,7 +251,7 @@ const token = localStorage.getItem("token");
       router.push(`/chat?conversationId=${result?.conversation?._id}`);
 
       setTimeout(() => {
-      fetchConversations(true);
+        fetchConversations(true);
       }, 300);
     } catch (error) {
       console.error("Start direct chat error:", error);
@@ -269,7 +268,7 @@ const token = localStorage.getItem("token");
       {
         method: "DELETE",
         headers: getAuthHeaders(),
-      }
+      },
     );
 
     if (await handleUnauthorized(res)) return;
@@ -280,7 +279,7 @@ const token = localStorage.getItem("token");
       onRefresh?.();
       onSelectConversation(null);
       router.push("/chat");
-     fetchConversations(true);
+      fetchConversations(true);
     }
   }
 
@@ -297,7 +296,7 @@ const token = localStorage.getItem("token");
 
   async function handleDeleteAccount() {
     const confirmDelete = window.confirm(
-      "Are you sure? This will permanently delete your account, chats, messages and groups."
+      "Are you sure? This will permanently delete your account, chats, messages and groups.",
     );
 
     if (!confirmDelete) return;
@@ -334,33 +333,52 @@ const token = localStorage.getItem("token");
     return (
       user?.avatar ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        user?.name || "User"
-      )}&background=00a884&color=fff`
+        user?.name || "User",
+      )}&background=ff6b2c&color=ffffff&bold=true`
     );
   }
 
+  function getGroupFallbackAvatar(name) {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      name || "Group",
+    )}&background=ff6b2c&color=ffffff&bold=true`;
+  }
+
+  function isUiAvatar(url) {
+    return typeof url === "string" && url.includes("ui-avatars.com/api");
+  }
+
   function getConversationName(conversation) {
-    if (conversation?.type === "group") return conversation?.name;
+    if (conversation?.type === "group") return conversation?.name || "Group";
 
     const receiver = conversation?.members?.find(
-      (member) => member?._id !== currentUser?._id
+      (member) => member?._id !== currentUser?._id,
     );
 
     return receiver?.name || "Unknown User";
   }
 
+  function getGroupFallbackAvatar(name) {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      name || "Group",
+    )}&background=ff6b2c&color=ffffff&bold=true`;
+  }
+
+  function isGeneratedAvatar(url) {
+    return typeof url === "string" && url.includes("ui-avatars.com");
+  }
+
   function getConversationAvatar(conversation) {
     if (conversation?.type === "group") {
-      return (
-        conversation?.avatar ||
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-          conversation?.name || "Group"
-        )}&background=00a884&color=fff`
-      );
+      if (!conversation?.avatar || isGeneratedAvatar(conversation?.avatar)) {
+        return getGroupFallbackAvatar(conversation?.name);
+      }
+
+      return conversation.avatar;
     }
 
     const receiver = conversation?.members?.find(
-      (member) => member?._id !== currentUser?._id
+      (member) => member?._id !== currentUser?._id,
     );
 
     return getUserAvatar(receiver);
@@ -409,22 +427,16 @@ const token = localStorage.getItem("token");
         <button
           type="button"
           onClick={() => handleConversationClick(conversation)}
-          className="btn p-0 flex-grow-1 d-flex align-items-center text-start border-0 text-white overflow-hidden"
+          className="btn p-0 flex-grow-1 d-flex align-items-center text-start border-0 text-dark overflow-hidden"
         >
-          <img
-            src={getConversationAvatar(conversation)}
-            className="rounded-circle object-fit-cover flex-shrink-0"
-            width="48"
-            height="48"
-            alt="avatar"
-            onClick={(e) => {
-              e.stopPropagation();
-              setPreviewImage(getConversationAvatar(conversation));
-            }}
+          <ChatAvatar
+            conversation={conversation}
+            currentUser={currentUser}
+            size={44}
           />
 
           <div className="ms-3 flex-grow-1 overflow-hidden">
-            <div className="fw-bold text-white text-truncate">
+            <div className="fw-bold text-dark text-truncate">
               {getConversationName(conversation)}
             </div>
 
@@ -436,37 +448,36 @@ const token = localStorage.getItem("token");
             </div>
           </div>
 
-          <div
-            className="d-flex flex-column align-items-center justify-content-center gap-2 ms-2"
-            style={{ minWidth: 48 }}
-          >
-            {conversation?.unreadCount > 0 && (
-              <span
-                className="bg-success text-white rounded-circle d-flex align-items-center justify-content-center fw-bold"
-                style={{
-                  width: 24,
-                  height: 24,
-                  fontSize: 12,
-                }}
-              >
-                {conversation?.unreadCount > 99
-                  ? "99+"
-                  : conversation?.unreadCount}
-              </span>
-            )}
-          </div>
+          {conversation?.unreadCount > 0 && (
+            <span
+              className="text-white rounded-circle d-flex align-items-center justify-content-center fw-bold ms-2"
+              style={{
+                width: 24,
+                height: 24,
+                fontSize: 12,
+                background: orangeGradient,
+              }}
+            >
+              {conversation?.unreadCount > 99
+                ? "99+"
+                : conversation?.unreadCount}
+            </span>
+          )}
         </button>
 
-        <div ref={isMenuOpen ? chatMenuRef : null} className="position-relative">
+        <div
+          ref={isMenuOpen ? chatMenuRef : null}
+          className="position-relative"
+        >
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setOpenChatMenuId((prev) =>
-                prev === conversation?._id ? null : conversation?._id
+                prev === conversation?._id ? null : conversation?._id,
               );
             }}
-            className="btn btn-sm btn-dark ms-2 rounded-circle d-flex align-items-center justify-content-center"
+            className="btn btn-sm ms-2 rounded-circle d-flex align-items-center justify-content-center border-0 text-secondary"
             style={{ width: 34, height: 34 }}
             title="More"
           >
@@ -475,7 +486,7 @@ const token = localStorage.getItem("token");
 
           {isMenuOpen && (
             <div
-              className="position-absolute end-0 top-100 mt-2 bg-dark border border-secondary rounded-4 shadow-lg overflow-hidden"
+              className="position-absolute end-0 top-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden"
               style={{
                 width: 190,
                 zIndex: 9999,
@@ -487,7 +498,7 @@ const token = localStorage.getItem("token");
                   setOpenChatMenuId(null);
                   deleteConversation(conversation?._id);
                 }}
-                className="btn btn-dark w-100 text-start border-0 rounded-0 px-3 py-3 text-danger d-flex align-items-center gap-2"
+                className="btn w-100 text-start border-0 rounded-0 px-3 py-3 text-danger d-flex align-items-center gap-2"
               >
                 <FaTrashAlt size={14} />
                 <span className="small fw-semibold">Delete chat</span>
@@ -500,7 +511,65 @@ const token = localStorage.getItem("token");
   }
 
   return (
-    <aside className="sidebar-shell d-flex flex-column h-100 w-100">
+    <aside className="sidebar-shell d-flex flex-column h-100 w-100 position-relative">
+      <style>{`
+        .sidebar-profile-menu {
+          position: absolute;
+          left: 0;
+          top: calc(100% + 12px);
+          width: 230px;
+          background: #ffffff;
+          border: 1px solid #f1f1f1;
+          border-radius: 18px;
+          overflow: hidden;
+          z-index: 99999;
+          box-shadow: 0 18px 50px rgba(15, 23, 42, 0.16);
+        }
+
+        .sidebar-profile-menu::before {
+          content: "";
+          position: absolute;
+          top: -7px;
+          left: 18px;
+          width: 14px;
+          height: 14px;
+          background: #ffffff;
+          border-left: 1px solid #f1f1f1;
+          border-top: 1px solid #f1f1f1;
+          transform: rotate(45deg);
+        }
+
+        .sidebar-profile-menu-item {
+          width: 100%;
+          border: 0;
+          background: #ffffff;
+          padding: 13px 16px;
+          font-size: 14px;
+          font-weight: 600;
+          color: #334155;
+          transition: 0.18s ease;
+          position: relative;
+          z-index: 1;
+        }
+
+        .sidebar-profile-menu-item:hover {
+          background: #fff4ec;
+          color: #ff5b2f;
+        }
+
+        .orange-gradient-btn {
+          background: linear-gradient(135deg, #ff9d2e, #ff5b2f) !important;
+          color: #ffffff !important;
+          border: 0 !important;
+          box-shadow: 0 10px 24px rgba(255, 91, 47, 0.28);
+        }
+
+        .orange-gradient-btn:hover {
+          filter: brightness(0.98);
+          transform: translateY(-1px);
+        }
+      `}</style>
+
       <header className="sidebar-header d-flex align-items-center justify-content-between px-3 py-3">
         <div
           ref={profileMenuRef}
@@ -522,51 +591,52 @@ const token = localStorage.getItem("token");
           </button>
 
           {showProfileMenu && (
-            <div className="profile-menu shadow-lg">
+            <div className="sidebar-profile-menu">
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  setShowProfileMenu(false);
                   setPreviewImage(
-                    currentUser?.avatar || getUserAvatar(currentUser)
-                  )
-                }
-                className="profile-menu-item d-flex align-items-center"
+                    currentUser?.avatar || getUserAvatar(currentUser),
+                  );
+                }}
+                className="sidebar-profile-menu-item d-flex align-items-center gap-2"
               >
-                <FaEye className="me-2" />
+                <FaEye />
                 View Profile
               </button>
 
               <button
                 type="button"
                 onClick={handleEditProfile}
-                className="profile-menu-item d-flex align-items-center"
+                className="sidebar-profile-menu-item d-flex align-items-center gap-2"
               >
-                <FaUserEdit className="me-2" />
+                <FaUserEdit />
                 Edit Profile
               </button>
 
               <button
                 type="button"
                 onClick={handleDeleteAccount}
-                className="profile-menu-item text-danger d-flex align-items-center"
+                className="sidebar-profile-menu-item text-danger d-flex align-items-center gap-2"
               >
-                <FaTrashAlt className="me-2" />
+                <FaTrashAlt />
                 Delete Account
               </button>
 
               <button
                 type="button"
                 onClick={handleLogout}
-                className="profile-menu-item text-danger d-flex align-items-center"
+                className="sidebar-profile-menu-item text-danger d-flex align-items-center gap-2"
               >
-                <FaSignOutAlt className="me-2" />
+                <FaSignOutAlt />
                 Logout
               </button>
             </div>
           )}
 
           <div className="overflow-hidden">
-            <h6 className="mb-0 fw-bold text-white text-truncate">
+            <h6 className="mb-0 fw-bold text-dark text-truncate">
               {currentUser?.name || "User"}
             </h6>
             <small className="text-secondary">ChatterBox Pro Max</small>
@@ -576,7 +646,7 @@ const token = localStorage.getItem("token");
         <button
           type="button"
           onClick={() => setShowGroup(true)}
-          className="btn btn-success rounded-circle d-flex align-items-center justify-content-center sidebar-icon-btn"
+          className="btn rounded-circle d-flex align-items-center justify-content-center sidebar-icon-btn orange-gradient-btn"
           title="Create Group"
         >
           <FaPlus />
@@ -605,7 +675,7 @@ const token = localStorage.getItem("token");
         <button
           type="button"
           onClick={() => setShowNetwork(true)}
-          className="btn btn-success w-100 rounded-4 py-3 fw-bold d-flex align-items-center justify-content-center gap-2"
+          className="btn w-100 rounded-4 py-3 fw-bold d-flex align-items-center justify-content-center gap-2 orange-gradient-btn"
           disabled={usersLoading}
         >
           <FaUserFriends />
@@ -636,7 +706,7 @@ const token = localStorage.getItem("token");
           <SidebarSkeleton count={5} />
         ) : privateChats?.length > 0 ? (
           privateChats.map((conversation) =>
-            renderConversationItem(conversation)
+            renderConversationItem(conversation),
           )
         ) : (
           <p className="px-3 py-2 small text-secondary mb-0">No chats yet</p>
@@ -659,7 +729,7 @@ const token = localStorage.getItem("token");
             }
 
             onRefresh?.();
-          fetchConversations(true);
+            fetchConversations(true);
           }}
         />
       )}

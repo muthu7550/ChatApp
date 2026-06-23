@@ -1,7 +1,14 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { FaCamera, FaCheck, FaSearch, FaTimes, FaUsers } from "react-icons/fa";
+import {
+  FaCamera,
+  FaCheck,
+  FaSearch,
+  FaTimes,
+  FaUsers,
+  FaUserPlus,
+} from "react-icons/fa";
 import Cropper from "react-easy-crop";
 
 export default function CreateGroupModal({
@@ -27,7 +34,6 @@ export default function CreateGroupModal({
 
   const filteredUsers = useMemo(() => {
     const value = search.toLowerCase().trim();
-
     return users.filter((user) => user?.name?.toLowerCase().includes(value));
   }, [users, search]);
 
@@ -35,7 +41,7 @@ export default function CreateGroupModal({
     setSelectedUsers((prev) =>
       prev.includes(userId)
         ? prev.filter((id) => id !== userId)
-        : [...prev, userId],
+        : [...prev, userId]
     );
   }
 
@@ -43,8 +49,8 @@ export default function CreateGroupModal({
     return (
       user?.avatar ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        user?.name || "User",
-      )}&background=00a884&color=fff`
+        user?.name || "User"
+      )}&background=ff6b2c&color=fff`
     );
   }
 
@@ -52,8 +58,8 @@ export default function CreateGroupModal({
     return (
       avatar ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        name || "Group",
-      )}&background=00a884&color=fff`
+        name || "Group"
+      )}&background=ff6b2c&color=fff`
     );
   }
 
@@ -87,7 +93,9 @@ export default function CreateGroupModal({
 
       const formData = new FormData();
       formData.append("file", file);
+
       const token = localStorage.getItem("token");
+
       const res = await fetch("/api/upload", {
         method: "POST",
         headers: {
@@ -115,26 +123,16 @@ export default function CreateGroupModal({
   }
 
   async function createGroup() {
-    if (!name.trim()) {
-      alert("Group name required");
-      return;
-    }
-
-    if (!currentUser?._id) {
-      alert("Login again");
-      return;
-    }
-
-    if (selectedUsers.length === 0) {
-      alert("Select at least one user");
-      return;
-    }
+    if (!name.trim()) return alert("Group name required");
+    if (!currentUser?._id) return alert("Login again");
+    if (selectedUsers.length === 0) return alert("Select at least one user");
 
     try {
       setCreating(true);
 
+      const token = localStorage.getItem("token");
       const members = [currentUser._id, ...selectedUsers];
-const token = localStorage.getItem("token");
+
       const res = await fetch("/api/conversations", {
         method: "POST",
         headers: {
@@ -167,108 +165,19 @@ const token = localStorage.getItem("token");
   }
 
   return (
-    <div className="group-modal-backdrop">
-      <div className="group-modal-card bg-dark text-white shadow-lg">
-        <style>{`
-          .group-modal-backdrop {
-            position: fixed;
-            inset: 0;
-            z-index: 9999;
-            background: rgba(0,0,0,.75);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 12px;
-          }
-
-          .group-modal-card {
-            width: min(100%, 520px);
-            height: min(92dvh, 760px);
-            max-height: 92dvh;
-            border-radius: 24px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-          }
-
-          .group-modal-header {
-            flex: 0 0 auto;
-            border-bottom: 1px solid #2a3942;
-          }
-
-          .group-modal-body {
-            flex: 1 1 auto;
-            min-height: 0;
-            overflow-y: auto;
-            padding: 20px;
-          }
-
-          .group-modal-footer {
-            flex: 0 0 auto;
-            border-top: 1px solid #2a3942;
-            background: rgba(0,0,0,.35);
-            padding: 12px;
-            padding-bottom: calc(12px + env(safe-area-inset-bottom));
-          }
-
-          .group-users-list {
-            max-height: 260px;
-            overflow-y: auto;
-          }
-
-          .group-user-row:hover {
-            background: #202c33 !important;
-          }
-
-          .group-scroll::-webkit-scrollbar,
-          .group-modal-body::-webkit-scrollbar,
-          .group-users-list::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-          }
-
-          .group-scroll::-webkit-scrollbar-thumb,
-          .group-modal-body::-webkit-scrollbar-thumb,
-          .group-users-list::-webkit-scrollbar-thumb {
-            background: #2a3942;
-            border-radius: 999px;
-          }
-
-          @media (max-width: 575px) {
-            .group-modal-backdrop {
-              align-items: center !important;
-              padding: 10px;
-            }
-
-            .group-modal-card {
-              width: 100%;
-              height: 90dvh;
-              max-height: 90dvh;
-              border-radius: 22px;
-            }
-
-            .group-modal-body {
-              padding: 14px;
-            }
-
-            .group-users-list {
-              max-height: 230px;
-            }
-          }
-        `}</style>
-
-        <header className="group-modal-header d-flex align-items-center justify-content-between px-4 py-3">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/35 backdrop-blur-sm px-4">
+      <div className="w-full max-w-[760px] max-h-[90vh] overflow-hidden rounded-[28px] bg-white shadow-2xl border border-gray-100 d-flex flex-column">
+        <header className="d-flex align-items-center justify-content-between px-4 px-sm-5 py-4 border-bottom bg-white">
           <div className="d-flex align-items-center gap-3 min-w-0">
-            <div
-              className="rounded-circle bg-success bg-opacity-25 d-flex align-items-center justify-content-center text-success flex-shrink-0"
-              style={{ width: 44, height: 44 }}
-            >
-              <FaUsers />
+            <div className="h-12 w-12 rounded-2xl bg-orange-50 text-orange-500 d-flex align-items-center justify-content-center">
+              <FaUsers size={20} />
             </div>
 
             <div className="min-w-0">
-              <h5 className="mb-0 fw-bold text-truncate">Create Group</h5>
-              <small className="text-secondary">
+              <h4 className="mb-0 fw-bold text-gray-900 text-truncate">
+                Create Group
+              </h4>
+              <small className="text-gray-500">
                 {selectedUsers.length} member selected
               </small>
             </div>
@@ -277,169 +186,179 @@ const token = localStorage.getItem("token");
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-sm btn-outline-light rounded-circle flex-shrink-0"
-            style={{ width: 36, height: 36 }}
+            className="h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 d-flex align-items-center justify-content-center border-0"
           >
             <FaTimes />
           </button>
         </header>
 
-        <div className="group-modal-body">
-          <div className="d-flex flex-column align-items-center mb-4">
-            <div className="position-relative">
-              <img
-                src={getGroupAvatar()}
-                className="rounded-circle object-fit-cover border border-4 border-success"
-                width="104"
-                height="104"
-                alt="group"
-              />
-
-              <label
-                className="position-absolute bottom-0 end-0 btn btn-success rounded-circle d-flex align-items-center justify-content-center shadow"
-                style={{ width: 38, height: 38 }}
-              >
-                <FaCamera size={14} />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  hidden
-                  accept="image/*"
-                  onChange={handleSelectImage}
+        <div className="overflow-auto p-4 p-sm-5 bg-[#fafafa] flex-grow-1">
+          <div className="bg-white rounded-[22px] p-4 shadow-sm border border-gray-100 mb-4">
+            <div className="d-flex align-items-center gap-4">
+              <div className="position-relative flex-shrink-0">
+                <img
+                  src={getGroupAvatar()}
+                  className="rounded-circle object-fit-cover shadow-sm"
+                  width="74"
+                  height="74"
+                  alt="group"
                 />
-              </label>
+
+                <label className="position-absolute bottom-0 end-0 h-8 w-8 rounded-full bg-orange-500 text-white d-flex align-items-center justify-content-center shadow cursor-pointer">
+                  <FaCamera size={12} />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    hidden
+                    accept="image/*"
+                    onChange={handleSelectImage}
+                  />
+                </label>
+              </div>
+
+              <div className="flex-grow-1 min-w-0">
+                <label className="form-label small fw-semibold text-gray-600 mb-2">
+                  Group name
+                </label>
+
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter group name"
+                  maxLength={40}
+                  className="form-control border-0 bg-gray-100 rounded-pill px-4 py-3 text-gray-800 shadow-none"
+                />
+
+                <small className="text-gray-400 d-block mt-2">
+                  {uploading ? "Uploading image..." : "Add a clear name and photo"}
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[22px] p-4 shadow-sm border border-gray-100">
+            <div className="d-flex align-items-center justify-content-between mb-3">
+              <div>
+                <h6 className="mb-0 fw-bold text-gray-900">Add Members</h6>
+                <small className="text-gray-500">
+                  Choose users for this group
+                </small>
+              </div>
+
+              <div className="h-9 w-9 rounded-full bg-orange-50 text-orange-500 d-flex align-items-center justify-content-center">
+                <FaUserPlus size={14} />
+              </div>
             </div>
 
-            <small className="text-secondary mt-2">
-              {uploading ? "Uploading image..." : "Tap camera to upload image"}
-            </small>
-          </div>
-
-          <div className="mb-3">
-            <label className="form-label small text-secondary">
-              Group name
-            </label>
-
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter group name"
-              className="form-control form-control-lg bg-black bg-opacity-50 text-white border-secondary rounded-4"
-              maxLength={40}
-            />
-          </div>
-
-          <div className="mb-3">
-            <label className="form-label small text-secondary">
-              Add members
-            </label>
-
-            <div className="position-relative">
-              <FaSearch className="position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary" />
+            <div className="position-relative mb-4">
+              <FaSearch className="position-absolute top-50 start-0 translate-middle-y ms-4 text-gray-400" />
 
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search users..."
-                className="form-control bg-black bg-opacity-50 text-white border-secondary rounded-4 ps-5 py-3"
+                className="form-control border-0 bg-gray-100 rounded-pill ps-5 py-3 text-gray-800 shadow-none"
               />
             </div>
-          </div>
 
-          {selectedUsers.length > 0 && (
-            <div className="d-flex gap-2 overflow-auto pb-3 mb-2 group-scroll">
-              {selectedUsers.map((id) => {
-                const user = users.find((item) => item?._id === id);
+            {selectedUsers.length > 0 && (
+              <div className="d-flex gap-3 overflow-auto pb-4 mb-3">
+                {selectedUsers.map((id) => {
+                  const user = users.find((item) => item?._id === id);
 
-                return (
-                  <div
-                    key={id}
-                    className="text-center flex-shrink-0 position-relative"
-                    style={{ width: 64 }}
-                  >
-                    <img
-                      src={getAvatar(user)}
-                      className="rounded-circle object-fit-cover"
-                      width="48"
-                      height="48"
-                      alt={user?.name || "user"}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => toggleUser(id)}
-                      className="btn btn-danger btn-sm rounded-circle position-absolute top-0 end-0 d-flex align-items-center justify-content-center p-0"
-                      style={{ width: 18, height: 18 }}
+                  return (
+                    <div
+                      key={id}
+                      className="position-relative text-center flex-shrink-0"
+                      style={{ width: 68 }}
                     >
-                      <FaTimes size={9} />
-                    </button>
+                      <img
+                        src={getAvatar(user)}
+                        className="rounded-circle object-fit-cover shadow-sm"
+                        width="50"
+                        height="50"
+                        alt={user?.name || "user"}
+                      />
 
-                    <small className="d-block text-truncate text-secondary mt-1">
-                      {user?.name || "User"}
-                    </small>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                      <button
+                        type="button"
+                        onClick={() => toggleUser(id)}
+                        className="position-absolute top-0 end-0 h-5 w-5 rounded-full bg-red-500 text-white d-flex align-items-center justify-content-center border-0"
+                      >
+                        <FaTimes size={9} />
+                      </button>
 
-          <div className="group-users-list group-scroll">
-            {filteredUsers.length > 0 ? (
-              filteredUsers.map((user) => {
-                const selected = selectedUsers.includes(user?._id);
-
-                return (
-                  <button
-                    key={user?._id}
-                    type="button"
-                    onClick={() => toggleUser(user?._id)}
-                    className="group-user-row btn w-100 border-0 text-start text-white d-flex align-items-center gap-3 rounded-4 p-3 mb-2"
-                    style={{ background: selected ? "#123f35" : "#111b21" }}
-                  >
-                    <img
-                      src={getAvatar(user)}
-                      className="rounded-circle object-fit-cover flex-shrink-0"
-                      width="46"
-                      height="46"
-                      alt={user?.name}
-                    />
-
-                    <div className="flex-grow-1 overflow-hidden">
-                      <div className="fw-semibold text-truncate">
-                        {user?.name}
-                      </div>
-
-                      <small className="text-secondary d-block text-truncate">
-                        {user?.about || "Hey there! I am using ChatterBox 😂"}
+                      <small className="d-block text-truncate text-gray-500 mt-2">
+                        {user?.name || "User"}
                       </small>
                     </div>
-
-                    <span
-                      className={`rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 ${
-                        selected ? "bg-success" : "border border-secondary"
-                      }`}
-                      style={{ width: 26, height: 26 }}
-                    >
-                      {selected && <FaCheck size={12} />}
-                    </span>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="text-center py-5 text-secondary">
-                <FaUsers size={36} className="mb-3 opacity-50" />
-                <p className="mb-0">No users found</p>
+                  );
+                })}
               </div>
             )}
+
+            <div className="d-flex flex-column gap-2 max-h-[300px] overflow-auto pe-1">
+              {filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => {
+                  const selected = selectedUsers.includes(user?._id);
+
+                  return (
+                    <button
+                      key={user?._id}
+                      type="button"
+                      onClick={() => toggleUser(user?._id)}
+                      className={`w-100 border-0 text-start d-flex align-items-center gap-3 rounded-[20px] p-3 transition ${
+                        selected
+                          ? "bg-orange-50"
+                          : "bg-gray-50 hover:bg-gray-100"
+                      }`}
+                    >
+                      <img
+                        src={getAvatar(user)}
+                        className="rounded-circle object-fit-cover flex-shrink-0"
+                        width="50"
+                        height="50"
+                        alt={user?.name || "user"}
+                      />
+
+                      <div className="flex-grow-1 overflow-hidden">
+                        <div className="fw-bold text-gray-900 text-truncate">
+                          {user?.name || "User"}
+                        </div>
+
+                        <small className="text-gray-500 d-block text-truncate">
+                          {user?.about || "Hey there! I am using ChatterBox 😂"}
+                        </small>
+                      </div>
+
+                      <span
+                        className={`h-7 w-7 rounded-full d-flex align-items-center justify-content-center flex-shrink-0 ${
+                          selected
+                            ? "bg-orange-500 text-white"
+                            : "border border-gray-300 bg-white"
+                        }`}
+                      >
+                        {selected && <FaCheck size={12} />}
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="text-center py-5 text-gray-400">
+                  <FaUsers size={36} className="mx-auto mb-3 opacity-50" />
+                  <p className="mb-0">No users found</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <footer className="group-modal-footer d-flex gap-2">
+        <footer className="bg-white px-4 px-sm-5 py-4 border-top d-flex gap-3">
           <button
             type="button"
             onClick={onClose}
             disabled={creating}
-            className="btn btn-outline-light rounded-4 flex-fill py-3 fw-semibold"
+            className="btn rounded-pill flex-fill py-3 fw-semibold bg-gray-100 text-gray-700 border-0"
           >
             Cancel
           </button>
@@ -448,7 +367,10 @@ const token = localStorage.getItem("token");
             type="button"
             onClick={createGroup}
             disabled={creating || uploading}
-            className="btn btn-success rounded-4 flex-fill py-3 fw-bold"
+            className="btn rounded-pill flex-fill py-3 fw-bold text-white border-0 shadow-sm"
+            style={{
+              background: "linear-gradient(135deg, #ff9f43, #ff5c2a)",
+            }}
           >
             {creating ? "Creating..." : "Create Group"}
           </button>
@@ -456,7 +378,7 @@ const token = localStorage.getItem("token");
       </div>
 
       {showCropper && (
-        <div className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-90 z-3 d-flex flex-column">
+        <div className="fixed inset-0 z-[10000] bg-black/95 d-flex flex-column">
           <div className="position-relative flex-grow-1">
             <Cropper
               image={imageSrc}
@@ -471,7 +393,7 @@ const token = localStorage.getItem("token");
             />
           </div>
 
-          <div className="bg-dark p-3">
+          <div className="bg-white p-4">
             <input
               type="range"
               min={1}
@@ -482,14 +404,14 @@ const token = localStorage.getItem("token");
               className="form-range"
             />
 
-            <div className="d-flex gap-2">
+            <div className="d-flex gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setShowCropper(false);
                   setImageSrc(null);
                 }}
-                className="btn btn-outline-light flex-fill"
+                className="btn bg-gray-100 rounded-pill flex-fill py-3 fw-semibold"
               >
                 Cancel
               </button>
@@ -497,7 +419,10 @@ const token = localStorage.getItem("token");
               <button
                 type="button"
                 onClick={uploadCroppedImage}
-                className="btn btn-success flex-fill"
+                className="btn rounded-pill flex-fill py-3 fw-bold text-white border-0"
+                style={{
+                  background: "linear-gradient(135deg, #ff9f43, #ff5c2a)",
+                }}
               >
                 {uploading ? "Uploading..." : "Crop & Upload"}
               </button>
@@ -531,7 +456,7 @@ function getCroppedBlob(imageSrc, crop) {
         0,
         0,
         crop.width,
-        crop.height,
+        crop.height
       );
 
       canvas.toBlob(
@@ -540,7 +465,7 @@ function getCroppedBlob(imageSrc, crop) {
           resolve(blob);
         },
         "image/jpeg",
-        0.9,
+        0.9
       );
     };
 

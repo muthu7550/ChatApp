@@ -27,12 +27,15 @@ export default function NetworkModal({
   async function fetchUsers(searchText = "") {
     try {
       setLoading(true);
-const token = localStorage.getItem("token");
+
+      const token = localStorage.getItem("token");
+
       const res = await fetch(
-        `/api/users?userId=${currentUser?._id}&search=${searchText}`,{
-           headers: {
-    Authorization: token ? `Bearer ${token}` : "",
-  },
+        `/api/users?userId=${currentUser?._id}&search=${searchText}`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+          },
         }
       );
 
@@ -51,59 +54,25 @@ const token = localStorage.getItem("token");
       user?.avatar ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(
         user?.name || "User"
-      )}&background=00a884&color=fff`
+      )}&background=ff6b2c&color=fff`
     );
   }
 
   return (
-    <div className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-75 d-flex align-items-end align-items-sm-center justify-content-center z-3 px-0 px-sm-3">
-      <div
-        className="bg-dark text-white shadow-lg w-100 overflow-hidden network-modal-card"
-        style={{
-          maxWidth: "560px",
-          maxHeight: "92vh",
-          borderRadius: "24px 24px 0 0",
-        }}
-      >
-        <style>{`
-          @media (min-width: 576px) {
-            .network-modal-card {
-              border-radius: 24px !important;
-            }
-          }
-
-          .network-scroll::-webkit-scrollbar {
-            width: 6px;
-          }
-
-          .network-scroll::-webkit-scrollbar-thumb {
-            background: #2a3942;
-            border-radius: 999px;
-          }
-
-          .network-user-row {
-            background: #111b21;
-            transition: 0.2s ease;
-          }
-
-          .network-user-row:hover {
-            background: #202c33;
-          }
-        `}</style>
-
-        <header className="d-flex align-items-center justify-content-between px-4 py-3 border-bottom border-secondary">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/35 backdrop-blur-sm px-4">
+      <div className="w-full max-w-[720px] max-h-[90vh] overflow-hidden rounded-[28px] bg-white shadow-2xl border border-gray-100 d-flex flex-column">
+        <header className="d-flex align-items-center justify-content-between px-4 px-sm-5 py-4 border-bottom bg-white">
           <div className="d-flex align-items-center gap-3 min-w-0">
-            <div
-              className="rounded-circle bg-success bg-opacity-25 d-flex align-items-center justify-content-center text-success flex-shrink-0"
-              style={{ width: 44, height: 44 }}
-            >
-              <FaUserFriends />
+            <div className="h-12 w-12 rounded-2xl bg-orange-50 text-orange-500 d-flex align-items-center justify-content-center">
+              <FaUserFriends size={20} />
             </div>
 
             <div className="min-w-0">
-              <h5 className="mb-0 fw-bold text-truncate">Our Network</h5>
-              <small className="text-secondary">
-                Search users and connect
+              <h4 className="mb-0 fw-bold text-gray-900 text-truncate">
+                Our Network
+              </h4>
+              <small className="text-gray-500">
+                Search users and connect instantly
               </small>
             </div>
           </div>
@@ -111,16 +80,15 @@ const token = localStorage.getItem("token");
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-sm btn-outline-light rounded-circle flex-shrink-0"
-            style={{ width: 36, height: 36 }}
+            className="h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 d-flex align-items-center justify-content-center border-0 transition"
           >
             <FaTimes />
           </button>
         </header>
 
-        <div className="p-3 p-sm-4 border-bottom border-secondary">
+        <div className="px-4 px-sm-5 py-4 bg-[#fafafa] border-bottom">
           <div className="position-relative">
-            <FaSearch className="position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary" />
+            <FaSearch className="position-absolute top-50 start-0 translate-middle-y ms-4 text-gray-400" />
 
             <input
               value={search}
@@ -130,78 +98,77 @@ const token = localStorage.getItem("token");
                 fetchUsers(value);
               }}
               placeholder="Search user by name..."
-              className="form-control bg-black bg-opacity-50 text-white border-secondary rounded-4 ps-5 py-3"
+              className="form-control border-0 bg-white rounded-pill ps-5 py-3 text-gray-800 shadow-sm"
             />
           </div>
         </div>
 
-        <div
-          className="network-scroll overflow-auto p-3 p-sm-4"
-          style={{ maxHeight: "calc(92vh - 150px)" }}
-        >
+        <div className="overflow-auto p-4 p-sm-5 bg-[#fafafa] flex-grow-1">
           {loading ? (
             <NetworkSkeleton />
           ) : users.length > 0 ? (
-            users.map((user) => (
-              <div
-                key={user?._id}
-                className="network-user-row d-flex align-items-center gap-3 rounded-4 p-3 mb-2"
-              >
-                <img
-                  src={getAvatar(user)}
-                  className="rounded-circle object-fit-cover flex-shrink-0"
-                  width="50"
-                  height="50"
-                  alt={user?.name || "user"}
-                />
+            <div className="d-flex flex-column gap-3">
+              {users.map((user) => (
+                <div
+                  key={user?._id}
+                  className="d-flex align-items-center gap-3 rounded-[22px] bg-white p-3 shadow-sm border border-gray-100 hover:bg-gray-50 transition"
+                >
+                  <img
+                    src={getAvatar(user)}
+                    className="rounded-circle object-fit-cover flex-shrink-0"
+                    width="54"
+                    height="54"
+                    alt={user?.name || "user"}
+                  />
 
-                <div className="flex-grow-1 overflow-hidden">
-                  <div className="fw-bold text-truncate">
-                    {user?.name || "User"}
+                  <div className="flex-grow-1 overflow-hidden">
+                    <div className="fw-bold text-gray-900 text-truncate">
+                      {user?.name || "User"}
+                    </div>
+
+                    <small className="text-gray-500 d-block text-truncate">
+                      {user?.about || "Hey there! I am using ChatterBox 😂"}
+                    </small>
                   </div>
 
-                  <small className="text-secondary d-block text-truncate">
-                    {user?.about || "Hey there! I am using ChatterBox 😂"}
-                  </small>
+                  <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onStartChat(user?._id)}
+                      className="h-10 w-10 rounded-full border-0 text-white d-flex align-items-center justify-content-center shadow-sm"
+                      style={{
+                        background: "linear-gradient(135deg, #ff9f43, #ff5c2a)",
+                      }}
+                      title="Chat"
+                    >
+                      <FaComments size={15} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onStartCall(user?._id, "audio")}
+                      className="h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 border-0 d-flex align-items-center justify-content-center"
+                      title="Audio Call"
+                    >
+                      <FaMicrophone size={14} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onStartCall(user?._id, "video")}
+                      className="h-10 w-10 rounded-full bg-orange-50 hover:bg-orange-100 text-orange-500 border-0 d-flex align-items-center justify-content-center"
+                      title="Video Call"
+                    >
+                      <FaVideo size={14} />
+                    </button>
+                  </div>
                 </div>
-
-                <div className="d-flex align-items-center gap-2 flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => onStartChat(user?._id)}
-                    className="btn btn-success rounded-circle d-flex align-items-center justify-content-center"
-                    style={{ width: 38, height: 38 }}
-                    title="Chat"
-                  >
-                    <FaComments size={15} />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onStartCall(user?._id, "audio")}
-                    className="btn btn-outline-light rounded-circle d-flex align-items-center justify-content-center"
-                    style={{ width: 38, height: 38 }}
-                    title="Audio Call"
-                  >
-                    <FaMicrophone size={14} />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onStartCall(user?._id, "video")}
-                    className="btn btn-outline-success rounded-circle d-flex align-items-center justify-content-center"
-                    style={{ width: 38, height: 38 }}
-                    title="Video Call"
-                  >
-                    <FaVideo size={14} />
-                  </button>
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
-            <div className="text-center py-5 text-secondary">
-              <FaUserFriends size={42} className="mb-3 opacity-50" />
-              <h6 className="text-white">No users found</h6>
+            <div className="text-center py-5 text-gray-400">
+              <FaUserFriends size={42} className="mx-auto mb-3 opacity-50" />
+              <h6 className="text-gray-700 fw-bold">No users found</h6>
               <p className="mb-0 small">Try another search keyword.</p>
             </div>
           )}
@@ -213,30 +180,29 @@ const token = localStorage.getItem("token");
 
 function NetworkSkeleton() {
   return (
-    <>
+    <div className="d-flex flex-column gap-3">
       {[1, 2, 3, 4, 5].map((item) => (
         <div
           key={item}
-          className="d-flex align-items-center gap-3 rounded-4 p-3 mb-2"
-          style={{ background: "#111b21" }}
+          className="d-flex align-items-center gap-3 rounded-[22px] bg-white p-3 shadow-sm border border-gray-100"
         >
           <div
-            className="rounded-circle bg-secondary opacity-25"
-            style={{ width: 50, height: 50 }}
+            className="rounded-circle bg-gray-200"
+            style={{ width: 54, height: 54 }}
           />
 
           <div className="flex-grow-1">
             <div
-              className="bg-secondary opacity-25 rounded-pill mb-2"
-              style={{ width: "55%", height: 12 }}
+              className="bg-gray-200 rounded-pill mb-2"
+              style={{ width: "45%", height: 12 }}
             />
             <div
-              className="bg-secondary opacity-25 rounded-pill"
-              style={{ width: "80%", height: 10 }}
+              className="bg-gray-100 rounded-pill"
+              style={{ width: "70%", height: 10 }}
             />
           </div>
         </div>
       ))}
-    </>
+    </div>
   );
 }

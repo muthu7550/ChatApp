@@ -15,6 +15,7 @@ import {
 import Composer from "./Composer";
 import MessageBubble from "./MessageBubble";
 import { playNotifySound, showBrowserNotification } from "../lib/notifyClient";
+import { ChatAvatar } from "./Avatar";
 
 export default function ChatWindow({
   currentUser,
@@ -25,13 +26,11 @@ export default function ChatWindow({
   const router = useRouter();
 
   const token =
-  typeof window !== "undefined"
-    ? localStorage.getItem("token")
-    : null;
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-const authHeaders = {
-  Authorization: token ? `Bearer ${token}` : "",
-};
+  const authHeaders = {
+    Authorization: token ? `Bearer ${token}` : "",
+  };
 
   const [messages, setMessages] = useState([]);
   const [lastMessageId, setLastMessageId] = useState(null);
@@ -49,12 +48,12 @@ const authHeaders = {
     try {
       setMessagesLoading(true);
 
-const res = await fetch(
-  `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-  {
-    headers: authHeaders,
-  }
-);
+      const res = await fetch(
+        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+        {
+          headers: authHeaders,
+        },
+      );
 
       const result = await res.json();
       setMessages(result?.messages || []);
@@ -78,13 +77,13 @@ const res = await fetch(
 
     if (!ok) return;
 
-const res = await fetch(
-  `/api/messages/${messageId}?userId=${currentUser?._id}&type=${type}`,
-  {
-    method: "DELETE",
-    headers: authHeaders,
-  }
-);
+    const res = await fetch(
+      `/api/messages/${messageId}?userId=${currentUser?._id}&type=${type}`,
+      {
+        method: "DELETE",
+        headers: authHeaders,
+      },
+    );
 
     const result = await res.json();
 
@@ -97,13 +96,13 @@ const res = await fetch(
     const ok = confirm("Clear all messages in this chat?");
     if (!ok) return;
 
-const res = await fetch(
-  `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-  {
-    method: "DELETE",
-    headers: authHeaders,
-  }
-);
+    const res = await fetch(
+      `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+      {
+        method: "DELETE",
+        headers: authHeaders,
+      },
+    );
     const result = await res.json();
 
     if (result?.success) {
@@ -121,13 +120,13 @@ const res = await fetch(
 
     if (!ok) return;
 
-const res = await fetch(
-  `/api/conversations?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-  {
-    method: "DELETE",
-    headers: authHeaders,
-  }
-);
+    const res = await fetch(
+      `/api/conversations?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+      {
+        method: "DELETE",
+        headers: authHeaders,
+      },
+    );
     const result = await res.json();
 
     if (result?.success) {
@@ -138,9 +137,8 @@ const res = await fetch(
   }
 
   async function sendMessage(payload = {}) {
-
     const token = localStorage.getItem("token");
-    
+
     try {
       if (!conversation?._id) {
         alert("Select chat first");
@@ -166,25 +164,24 @@ const res = await fetch(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-           Authorization: token ? `Bearer ${token}` : "",
+          Authorization: token ? `Bearer ${token}` : "",
         },
         body: JSON.stringify(messagePayload),
       });
 
-      console.log(res,"ress")
+      console.log(res, "ress");
 
-if (res.status === 401) {
-  localStorage.clear();
+      if (res.status === 401) {
+        localStorage.clear();
 
-  localStorage.setItem(
-    "sessionMessage",
-    "Your session has expired. Please login again."
-  );
+        localStorage.setItem(
+          "sessionMessage",
+          "Your session has expired. Please login again.",
+        );
 
-  router.push("/login");
-  return;
-}
-
+        router.push("/login");
+        return;
+      }
 
       const result = await res.json().catch(() => null);
 
@@ -227,10 +224,10 @@ if (res.status === 401) {
 
     const res = await fetch("/api/calls", {
       method: "POST",
-headers: {
-  "Content-Type": "application/json",
-  ...authHeaders,
-},
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
       body: JSON.stringify({
         conversationId: conversation?._id,
         callerId: currentUser?._id,
@@ -278,7 +275,7 @@ headers: {
         conversation?.avatar ||
         `https://ui-avatars.com/api/?name=${encodeURIComponent(
           conversation?.name || "Group",
-        )}&background=00a884&color=fff`
+        )}&background=ff6b2c&color=fff`
       );
     }
 
@@ -290,7 +287,7 @@ headers: {
       receiver?.avatar ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(
         receiver?.name || "User",
-      )}&background=00a884&color=fff`
+      )}&background=ff6b2c&color=fff`
     );
   }
 
@@ -298,12 +295,12 @@ headers: {
     if (!conversation?._id || !currentUser?._id) return;
 
     const interval = setInterval(async () => {
-const res = await fetch(
-  `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-  {
-    headers: authHeaders,
-  }
-);
+      const res = await fetch(
+        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+        {
+          headers: authHeaders,
+        },
+      );
 
       const result = await res.json();
       const latestMessage = result?.messages?.[result?.messages?.length - 1];
@@ -327,7 +324,7 @@ const res = await fetch(
       <main className="chat-window-shell d-none d-md-flex align-items-center justify-content-center">
         <div className="text-center px-4">
           <div className="display-1 mb-3">💬</div>
-          <h1 className="fw-black text-white">ChatterBox Pro Max </h1>
+          <h1 className="fw-black text-dark">ChatterBox Pro Max </h1>
           <p className="text-secondary mt-3">
             Select a chat, search your network, or create a group.
           </p>
@@ -343,23 +340,20 @@ const res = await fetch(
           <button
             type="button"
             onClick={onBack}
-            className="btn btn-sm btn-dark rounded-circle d-md-none me-2"
+            className="btn btn-sm  rounded-circle d-md-none me-2"
             title="Back"
           >
             <FaArrowLeft />
           </button>
 
-          <img
-            src={getChatAvatar()}
-            className="rounded-circle object-fit-cover flex-shrink-0"
-            width="42"
-            height="42"
-            alt="chat"
-            onClick={() => setPreviewImage(getChatAvatar())}
+          <ChatAvatar
+            conversation={conversation}
+            currentUser={currentUser}
+            size={44}
           />
 
           <div className="ms-2 ms-sm-3 min-w-0">
-            <h6 className="mb-0 text-white fw-bold text-truncate">
+            <h6 className="mb-0 text-dark fw-bold text-truncate">
               {getChatTitle()}
             </h6>
             <small className="text-secondary">
@@ -372,7 +366,11 @@ const res = await fetch(
           <button
             type="button"
             onClick={() => startCall("audio")}
-            className="btn btn-sm btn-dark rounded-circle chat-icon-btn"
+            className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
+            style={{
+              background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
+              boxShadow: "0 8px 20px rgba(255, 91, 47, 0.25)",
+            }}
             title="Audio Call"
           >
             <FaPhoneAlt />
@@ -381,7 +379,11 @@ const res = await fetch(
           <button
             type="button"
             onClick={() => startCall("video")}
-            className="btn btn-sm btn-success rounded-circle chat-icon-btn"
+            className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
+            style={{
+              background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
+              boxShadow: "0 8px 20px rgba(255, 91, 47, 0.25)",
+            }}
             title="Video Call"
           >
             <FaVideo />
@@ -474,7 +476,7 @@ function EmptyChat({ onQuickMessage, title }) {
           <FaCommentDots />
         </div>
 
-        <h3 className="text-white fw-bold mb-2">No Messages Yet</h3>
+        <h3 className="text-dark fw-bold mb-2">No Messages Yet</h3>
 
         <p className="text-secondary mb-4">
           Start a conversation with{" "}
@@ -485,7 +487,7 @@ function EmptyChat({ onQuickMessage, title }) {
           <button
             type="button"
             onClick={() => onQuickMessage("👋 Hello")}
-            className="btn btn-dark rounded-pill px-3"
+            className="btn  rounded-pill px-3"
           >
             👋 Hello
           </button>
@@ -493,7 +495,7 @@ function EmptyChat({ onQuickMessage, title }) {
           <button
             type="button"
             onClick={() => onQuickMessage("😊 How are you?")}
-            className="btn btn-dark rounded-pill px-3"
+            className="btn  rounded-pill px-3"
           >
             😊 How are you?
           </button>
@@ -501,7 +503,7 @@ function EmptyChat({ onQuickMessage, title }) {
           <button
             type="button"
             onClick={() => onQuickMessage("🎉 Welcome")}
-            className="btn btn-dark rounded-pill px-3"
+            className="btn  rounded-pill px-3"
           >
             🎉 Welcome
           </button>

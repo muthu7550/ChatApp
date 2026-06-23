@@ -135,7 +135,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0b141a] text-white flex items-center justify-center px-4">
+    <main className="min-h-screen bg-[#0b141a] text-dark flex items-center justify-center px-4">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-md bg-[#111b21] rounded-3xl p-8 space-y-5 shadow-2xl"
@@ -166,7 +166,7 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={() => cameraInputRef.current?.click()}
-              className="bg-blue-500 text-white px-5 py-2 rounded-xl font-bold rounded"
+              className="bg-blue-500 text-dark px-5 py-2 rounded-xl font-bold rounded"
             >
               Camera
             </button>
@@ -256,7 +256,7 @@ export default function ProfilePage() {
                   setShowCropper(false);
                   setImageSrc(null);
                 }}
-                className="flex-1 bg-zinc-700 text-white p-3 rounded-xl font-bold"
+                className="flex-1 bg-zinc-700 text-dark p-3 rounded-xl font-bold"
               >
                 Cancel
               </button>

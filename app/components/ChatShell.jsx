@@ -57,7 +57,7 @@ export default function ChatShell() {
   }
 
   return (
-    <div className="h-screen bg-zinc-950 text-white flex">
+    <div className="h-screen bg-zinc-950 text-dark flex">
       <aside className="w-80 border-r border-zinc-800 p-4 hidden md:block">
         <h1 className="text-2xl font-black">ChatterBox 😂</h1>
 

@@ -110,7 +110,7 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
   return (
     <div className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-75 d-flex align-items-center justify-content-center z-3">
       <div
-        className="bg-dark text-white rounded-4 p-4 text-center shadow-lg"
+        className="bg-dark text-dark rounded-4 p-4 text-center shadow-lg"
         style={{ width: 360 }}
       >
         <img
