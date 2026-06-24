@@ -34,13 +34,12 @@ export default function ChatWindow({
     Authorization: token ? `Bearer ${token}` : "",
   };
 
-  useEffect(() => {
-    if (!conversation?._id || !currentUser?._id) return;
+useEffect(() => {
+  if (!conversation?._id || !currentUser?._id) return;
 
-    setMessages([]);
-    setInitialChatLoading(true);
-    fetchMessages();
-  }, [conversation?._id, currentUser?._id]);
+  setMessages([]);
+  fetchMessages(true, true);
+}, [conversation?._id, currentUser?._id]);
 
   useEffect(() => {
     if (!conversation?._id) return;
@@ -74,39 +73,43 @@ export default function ChatWindow({
     return () => clearInterval(interval);
   }, [conversation?._id, currentUser?._id]);
 
-  async function fetchMessages(shouldScroll = true) {
-    try {
-      setMessagesLoading(true);
+async function fetchMessages(shouldScroll = true, showInitialSkeleton = false) {
+  try {
+    setMessagesLoading(true);
 
-      if (messages.length === 0) {
-        setInitialChatLoading(true);
-      }
+    if (showInitialSkeleton) {
+      setInitialChatLoading(true);
+    }
 
-      const res = await fetch(
-        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-        {
-          headers: authHeaders,
-        },
-      );
+    const res = await fetch(
+      `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+      {
+        headers: authHeaders,
+      },
+    );
 
-      const result = await res.json();
-      setMessages(result?.messages || []);
+    const result = await res.json();
+    setMessages(result?.messages || []);
 
-      if (shouldScroll) {
+    if (shouldScroll) {
+      requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            scrollToBottom(false);
-          });
+          scrollToBottom(false);
         });
-      }
-    } catch (error) {
-      console.error("Fetch messages error:", error);
-    } finally {
-      setMessagesLoading(false);
-      setInitialChatLoading(false);
+      });
+    }
+  } catch (error) {
+    console.error("Fetch messages error:", error);
+  } finally {
+    setMessagesLoading(false);
+
+    if (showInitialSkeleton) {
+      setTimeout(() => {
+        setInitialChatLoading(false);
+      }, 250);
     }
   }
-
+}
   function scrollToBottom(smooth = false) {
     bottomRef.current?.scrollIntoView({
       behavior: smooth ? "smooth" : "auto",
