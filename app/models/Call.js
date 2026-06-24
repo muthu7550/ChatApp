@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const CallSchema = new mongoose.Schema(
+const callSchema = new mongoose.Schema(
   {
     conversation: {
       type: mongoose.Schema.Types.ObjectId,
@@ -12,20 +12,30 @@ const CallSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    callType: {
+    receiver: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    members: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    type: {
       type: String,
       enum: ["audio", "video"],
       required: true,
     },
     status: {
       type: String,
-      enum: ["ringing", "accepted", "rejected", "missed", "ended"],
+      enum: ["ringing", "accepted", "rejected", "missed", "ended", "cancelled"],
       default: "ringing",
     },
+    startedAt: Date,
+    endedAt: Date,
   },
   { timestamps: true }
 );
 
-delete mongoose.models.Call;
-
-export default mongoose.model("Call", CallSchema);
+export default mongoose.models.Call || mongoose.model("Call", callSchema);

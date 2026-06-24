@@ -18,6 +18,12 @@ import {
   FaUserFriends,
 } from "react-icons/fa";
 import { ChatAvatar } from "./Avatar";
+import {
+  FaPhoneAlt,
+  FaVideo,
+  FaPhoneSlash,
+  FaPhoneVolume,
+} from "react-icons/fa";
 
 export default function Sidebar({
   currentUser,
@@ -56,6 +62,9 @@ export default function Sidebar({
 
   const searchValue = search.trim().toLowerCase();
   const isSearching = searchValue.length > 0;
+
+  const [calls, setCalls] = useState([]);
+  const [missedCallCount, setMissedCallCount] = useState(0);
 
   const searchedChats = useMemo(() => {
     if (!searchValue) return [];
@@ -117,12 +126,20 @@ export default function Sidebar({
 
     fetchConversations(conversations.length === 0);
     fetchUsers("", users.length === 0);
+    fetchCalls();
 
     const interval = setInterval(() => {
       fetchConversations(false);
     }, 5000);
 
-    return () => clearInterval(interval);
+    const callInterval = setInterval(() => {
+      fetchCalls();
+    }, 10000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(callInterval);
+    };
   }, [currentUser?._id, refreshKey]);
 
   useEffect(() => {
@@ -260,6 +277,17 @@ export default function Sidebar({
       console.error("Start direct chat error:", error);
       alert("Something went wrong");
     }
+  }
+
+  async function fetchCalls() {
+    const res = await fetch(`/api/calls?userId=${currentUser?._id}`, {
+      headers: getAuthHeaders(),
+    });
+
+    const result = await res.json();
+
+    setCalls(result?.calls || []);
+    setMissedCallCount(result?.missedCount || 0);
   }
 
   async function startCallFromNetwork(receiverId, type) {
@@ -936,20 +964,20 @@ export default function Sidebar({
         </button>
       </header>
 
-        <div className="p-3 search-wrapper">
-          <div className="input-group sidebar-search  border border-red-100 rounded-4">
-            <span className="input-group-text rounded-start-pill">
-              <FaSearch />
-            </span>
+      <div className="p-3 search-wrapper">
+        <div className="input-group sidebar-search  border border-red-100 rounded-4">
+          <span className="input-group-text rounded-start-pill">
+            <FaSearch />
+          </span>
 
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search chats or network users..."
-              className="form-control rounded-end-pill"
-            />
-          </div>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search chats or network users..."
+            className="form-control rounded-end-pill"
+          />
         </div>
+      </div>
 
       {!isSearching && (
         <div className="chat-filter-row px-3 pb-3">
@@ -957,6 +985,10 @@ export default function Sidebar({
             { key: "all", label: "All" },
             { key: "chats", label: "Chats" },
             { key: "groups", label: "Groups" },
+            {
+              key: "calls",
+              label: `Calls ${missedCallCount ? missedCallCount : ""}`,
+            },
           ].map((item) => (
             <button
               key={item.key}
@@ -973,6 +1005,78 @@ export default function Sidebar({
       )}
 
       <section className="sidebar-scroll flex-grow-1 overflow-auto pb-3">
+        {activeFilter === "calls" && !isSearching && (
+          <div className="search-result-card">
+            <div className="search-result-head">
+              <span>
+                <FaPhoneAlt className="me-2" />
+                Calls
+              </span>
+
+              <span className="badge bg-white text-dark rounded-pill">
+                {calls.length}
+              </span>
+            </div>
+
+            {calls.length > 0 ? (
+              calls.map((call) => {
+                const isOutgoing = call?.caller?._id === currentUser?._id;
+                const person = isOutgoing ? call?.receiver : call?.caller;
+
+                return (
+                  <button
+                    key={call?._id}
+                    type="button"
+                    className="network-result-item"
+                    onClick={() => {
+                      router.push(
+                        `/chat?conversationId=${
+                          call?.conversation?._id || call?.conversation
+                        }`,
+                      );
+                    }}
+                  >
+                    <span
+                      className="rounded-circle d-flex align-items-center justify-content-center text-white"
+                      style={{
+                        width: 44,
+                        height: 44,
+                        background:
+                          call?.status === "missed"
+                            ? "#ef4444"
+                            : "linear-gradient(135deg,#ff9d2e,#ff5b2f)",
+                      }}
+                    >
+                      {call?.type === "video" ? <FaVideo /> : <FaPhoneAlt />}
+                    </span>
+
+                    <div className="flex-grow-1 overflow-hidden">
+                      <div className="fw-bold text-dark text-truncate">
+                        {person?.name || "Unknown User"}
+                      </div>
+
+                      <small className="text-secondary d-block text-truncate">
+                        {isOutgoing ? "Outgoing" : "Incoming"} {call?.type} call
+                        · {call?.status}
+                      </small>
+                    </div>
+
+                    {call?.status === "missed" && (
+                      <FaPhoneSlash className="text-danger" />
+                    )}
+
+                    {call?.status === "accepted" && (
+                      <FaPhoneVolume className="text-success" />
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="empty-box">No calls yet</div>
+            )}
+          </div>
+        )}
+
         {isSearching ? (
           <>
             <div className="search-result-card">
@@ -1017,7 +1121,7 @@ export default function Sidebar({
           </>
         ) : (
           <>
-            {activeFilter !== "chats" && (
+          {activeFilter !== "calls" && activeFilter !== "chats" && (
               <AccordionSection
                 title="Groups"
                 icon={<FaUsers />}
@@ -1052,7 +1156,7 @@ export default function Sidebar({
               </AccordionSection>
             )}
 
-            {activeFilter !== "groups" && (
+           {activeFilter !== "calls" && activeFilter !== "groups" && (
               <AccordionSection
                 title="Chats"
                 icon={<FaComments />}

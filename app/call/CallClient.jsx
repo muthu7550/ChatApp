@@ -59,7 +59,7 @@ export default function CallClient() {
         localStorage.clear();
         sessionStorage.setItem(
           "sessionMessage",
-          "Your session has expired. Please login again."
+          "Your session has expired. Please login again.",
         );
         router.replace("/login");
         return;
@@ -77,6 +77,39 @@ export default function CallClient() {
 
     getToken();
   }, [room, router]);
+
+  useEffect(() => {
+    if (!callId) return;
+
+    const interval = setInterval(async () => {
+      const authToken = localStorage.getItem("token");
+
+      const res = await fetch(`/api/calls?userId=${user?._id}`, {
+        headers: {
+          Authorization: authToken ? `Bearer ${authToken}` : "",
+        },
+      });
+
+      const result = await res.json();
+
+      const activeCall = result?.calls?.find((item) => item?._id === callId);
+
+      if (activeCall?.status === "rejected") {
+        setError("Call rejected");
+        clearInterval(interval);
+      }
+
+      if (
+        activeCall?.status === "ended" ||
+        activeCall?.status === "cancelled"
+      ) {
+        router.replace(backToChatUrl);
+        clearInterval(interval);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [callId, user?._id]);
 
   async function endCall() {
     if (ending) return;
@@ -125,7 +158,7 @@ export default function CallClient() {
           src={
             user?.avatar ||
             `https://ui-avatars.com/api/?name=${encodeURIComponent(
-              user?.name || "User"
+              user?.name || "User",
             )}&background=00a884&color=fff`
           }
           className="call-loading-avatar"
