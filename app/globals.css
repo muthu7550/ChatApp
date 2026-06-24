@@ -629,3 +629,131 @@ button.rounded-circle {
   }
 }
 
+.search-icon-clean {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 14px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.search-input-clean {
+  padding-left: 46px !important;
+}
+
+.clean-input {
+  border: 1px solid #ffe0cf !important;
+  background: #fffaf7 !important;
+  border-radius: 18px !important;
+  padding: 14px 18px !important;
+  box-shadow: none !important;
+  color: #111827 !important;
+}
+
+.clean-input:focus {
+  border-color: #ff7a3d !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 4px rgba(255, 91, 47, 0.1) !important;
+}
+
+.validation-box {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #dc2626;
+  border-radius: 16px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.network-filter-btn {
+  width: 100%;
+  border: 1px solid #ffe0cf;
+  background: #fff7f1;
+  color: #ff5b2f;
+  border-radius: 16px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.network-filter-btn:hover {
+  background: #fff1e7;
+}
+
+.chat-header-skeleton-avatar,
+.chat-header-skeleton-name,
+.chat-header-skeleton-status,
+.chat-header-skeleton-btn {
+  background: linear-gradient(
+    90deg,
+    #fff3eb 25%,
+    #ffd9c7 50%,
+    #fff3eb 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+
+.chat-header-skeleton-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+
+.chat-header-skeleton-name {
+  width: 140px;
+  height: 14px;
+  border-radius: 20px;
+}
+
+.chat-header-skeleton-status {
+  width: 90px;
+  height: 10px;
+  border-radius: 20px;
+}
+
+.chat-header-skeleton-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.chat-message-list {
+  padding-bottom: 0;
+}
+
+.chat-body {
+  overflow-anchor: none;
+}
+
+.chat-message-list {
+  padding-bottom: 18px !important;
+}
+
+.chat-composer-wrap {
+  flex: 0 0 auto;
+  min-height: 76px;
+}
+
+.composer-hidden-but-space {
+  visibility: hidden;
+  pointer-events: none;
+}

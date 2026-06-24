@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import CreateGroupModal from "./CreateGroupModal";
 import NetworkModal from "./NetworkModal";
@@ -11,11 +11,11 @@ import {
   FaPlus,
   FaSearch,
   FaComments,
-  FaUserFriends,
   FaEye,
   FaTrashAlt,
   FaEllipsisV,
   FaChevronDown,
+  FaUserFriends,
 } from "react-icons/fa";
 import { ChatAvatar } from "./Avatar";
 
@@ -37,6 +37,7 @@ export default function Sidebar({
   const [showGroup, setShowGroup] = useState(false);
   const [showNetwork, setShowNetwork] = useState(false);
   const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
@@ -53,9 +54,44 @@ export default function Sidebar({
   const privateChats = conversations.filter((c) => c?.type === "direct");
   const groupChats = conversations.filter((c) => c?.type === "group");
 
+  const searchValue = search.trim().toLowerCase();
+  const isSearching = searchValue.length > 0;
+
+  const searchedChats = useMemo(() => {
+    if (!searchValue) return [];
+
+    return conversations.filter((conversation) =>
+      getConversationName(conversation).toLowerCase().includes(searchValue),
+    );
+  }, [conversations, searchValue, currentUser?._id]);
+
+  const existingDirectUserIds = useMemo(() => {
+    return new Set(
+      privateChats
+        .map((chat) => {
+          const receiver = chat?.members?.find(
+            (member) => member?._id !== currentUser?._id,
+          );
+          return receiver?._id;
+        })
+        .filter(Boolean),
+    );
+  }, [privateChats, currentUser?._id]);
+
+  const searchedNetworkUsers = useMemo(() => {
+    if (!searchValue) return [];
+
+    return users.filter(
+      (user) =>
+        user?._id &&
+        user?._id !== currentUser?._id &&
+        !existingDirectUserIds.has(user?._id) &&
+        user?.name?.toLowerCase().includes(searchValue),
+    );
+  }, [users, searchValue, currentUser?._id, existingDirectUserIds]);
+
   function getAuthHeaders(extraHeaders = {}) {
     const token = localStorage.getItem("token");
-
     return {
       Authorization: token ? `Bearer ${token}` : "",
       ...extraHeaders,
@@ -67,7 +103,7 @@ export default function Sidebar({
       localStorage.clear();
       localStorage.setItem(
         "sessionMessage",
-        "Your session has expired. Please login again."
+        "Your session has expired. Please login again.",
       );
       router.push("/auth/login");
       return true;
@@ -88,6 +124,16 @@ export default function Sidebar({
 
     return () => clearInterval(interval);
   }, [currentUser?._id, refreshKey]);
+
+  useEffect(() => {
+    if (!currentUser?._id) return;
+
+    const timer = setTimeout(() => {
+      fetchUsers(search, false);
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [search, currentUser?._id]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -142,7 +188,7 @@ export default function Sidebar({
         `/api/users?userId=${currentUser?._id}&search=${searchText}`,
         {
           headers: getAuthHeaders(),
-        }
+        },
       );
 
       if (await handleUnauthorized(res)) return;
@@ -184,17 +230,18 @@ export default function Sidebar({
       }
 
       setShowNetwork(false);
+      setSearch("");
 
       setConversations((prev) => {
         const exists = prev.some(
-          (item) => item?._id === result?.conversation?._id
+          (item) => item?._id === result?.conversation?._id,
         );
 
         if (exists) {
           return prev.map((item) =>
             item?._id === result?.conversation?._id
               ? result?.conversation
-              : item
+              : item,
           );
         }
 
@@ -204,7 +251,6 @@ export default function Sidebar({
       onSelectConversation(result?.conversation);
       setMobileChatOpen?.(true);
       router.push(`/chat?conversationId=${result?.conversation?._id}`);
-
       onRefresh?.();
 
       setTimeout(() => {
@@ -271,7 +317,7 @@ export default function Sidebar({
       {
         method: "DELETE",
         headers: getAuthHeaders(),
-      }
+      },
     );
 
     if (await handleUnauthorized(res)) return;
@@ -301,6 +347,7 @@ export default function Sidebar({
 
     if (await handleUnauthorized(res)) return;
 
+    setSearch("");
     onSelectConversation(conversation);
     setMobileChatOpen?.(true);
     router.push(`/chat?conversationId=${conversation?._id}`);
@@ -320,7 +367,7 @@ export default function Sidebar({
 
   async function handleDeleteAccount() {
     const confirmDelete = window.confirm(
-      "Are you sure? This will permanently delete your account, chats, messages and groups."
+      "Are you sure? This will permanently delete your account, chats, messages and groups.",
     );
 
     if (!confirmDelete) return;
@@ -357,7 +404,7 @@ export default function Sidebar({
     return (
       user?.avatar ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        user?.name || "User"
+        user?.name || "User",
       )}&background=ff6b2c&color=ffffff&bold=true`
     );
   }
@@ -366,7 +413,7 @@ export default function Sidebar({
     if (conversation?.type === "group") return conversation?.name || "Group";
 
     const receiver = conversation?.members?.find(
-      (member) => member?._id !== currentUser?._id
+      (member) => member?._id !== currentUser?._id,
     );
 
     return receiver?.name || "Unknown User";
@@ -377,7 +424,8 @@ export default function Sidebar({
     const isMenuOpen = openChatMenuId === conversation?._id;
 
     const lastSenderId =
-      conversation?.lastMessage?.sender?._id || conversation?.lastMessage?.sender;
+      conversation?.lastMessage?.sender?._id ||
+      conversation?.lastMessage?.sender;
 
     const lastMessageText =
       lastSenderId === currentUser?._id
@@ -407,7 +455,10 @@ export default function Sidebar({
               {getConversationName(conversation)}
             </div>
 
-            <div className="text-secondary text-truncate" style={{ fontSize: 13 }}>
+            <div
+              className="text-secondary text-truncate"
+              style={{ fontSize: 13 }}
+            >
               {lastMessageText}
             </div>
           </div>
@@ -429,13 +480,16 @@ export default function Sidebar({
           )}
         </button>
 
-        <div ref={isMenuOpen ? chatMenuRef : null} className="position-relative">
+        <div
+          ref={isMenuOpen ? chatMenuRef : null}
+          className="position-relative"
+        >
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setOpenChatMenuId((prev) =>
-                prev === conversation?._id ? null : conversation?._id
+                prev === conversation?._id ? null : conversation?._id,
               );
             }}
             className="btn btn-sm ms-2 rounded-circle d-flex align-items-center justify-content-center border-0 text-secondary"
@@ -467,30 +521,62 @@ export default function Sidebar({
     );
   }
 
+  function renderNetworkUser(user) {
+    return (
+      <button
+        key={user?._id}
+        type="button"
+        onClick={() => startDirectChat(user?._id)}
+        className="network-result-item"
+      >
+        <img src={getUserAvatar(user)} alt={user?.name || "User"} />
+
+        <div className="flex-grow-1 overflow-hidden">
+          <div className="fw-bold text-dark text-truncate">
+            {user?.name || "User"}
+          </div>
+          <small className="text-secondary text-truncate d-block">
+            From network
+          </small>
+        </div>
+
+        <span className="network-start-pill">Chat</span>
+      </button>
+    );
+  }
+
   return (
-    <aside className="sidebar-shell d-flex flex-column h-100 w-100 position-relative bg-white">
+    <aside className="sidebar-shell d-flex flex-column h-100 w-100 position-relative">
       <style>{`
         .sidebar-shell {
+          background:
+            radial-gradient(circle at 0% 0%, rgba(255,157,46,.28), transparent 34%),
+            radial-gradient(circle at 100% 16%, rgba(255,91,47,.16), transparent 28%),
+            linear-gradient(180deg, #fff7f1 0%, #ffffff 46%, #fffaf7 100%);
           color: #111827;
         }
 
-        .sidebar-top-btn {
-          width: 42px;
-          height: 42px;
-          border-radius: 999px;
-          border: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: linear-gradient(135deg, #ff9d2e, #ff5b2f);
-          color: white;
-          box-shadow: 0 10px 22px rgba(255, 91, 47, 0.25);
-          transition: .18s ease;
+        .sidebar-header {
+          background: linear-gradient(135deg, #fff1e7, #ffffff);
+          border-bottom: 1px solid #ffd9c7 !important;
         }
 
-        .sidebar-top-btn:hover {
-          transform: translateY(-1px);
-          filter: brightness(.98);
+        .profile-avatar-ring {
+          padding: 3px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #ff9d2e, #ff5b2f);
+        }
+
+        .network-svg-btn {
+          width: 44px;
+          height: 44px;
+          border: 0;
+          border-radius: 16px;
+          display: grid;
+          place-items: center;
+          color: #ffffff;
+          background: linear-gradient(135deg, #ff9d2e, #ff5b2f);
+          box-shadow: 0 12px 26px rgba(255, 91, 47, 0.3);
         }
 
         .sidebar-profile-menu {
@@ -514,7 +600,6 @@ export default function Sidebar({
           font-size: 14px;
           font-weight: 700;
           color: #334155;
-          transition: 0.18s ease;
         }
 
         .sidebar-profile-menu-item:hover {
@@ -523,27 +608,71 @@ export default function Sidebar({
         }
 
         .sidebar-search {
-          background: #f8fafc;
-          border-color: #eef2f7 !important;
+          background: #ffffff;
+           border: 2px solid;
+          border-color: #ff5b2f !important;
+          overflow: hidden;
+          box-shadow: 0 10px 25px rgba(255, 91, 47, 0.08);
         }
 
-        .sidebar-search .input-group-text,
-        .sidebar-search .form-control {
-          background: transparent;
+        .sidebar-search:focus-within {
+          border-color: #ff5b2f !important;
+          box-shadow: 0 0 0 4px rgba(255, 91, 47, 0.12);
+        }
+
+        .sidebar-search .input-group-text {
+          background: #ffffff;
           border: 0;
-          box-shadow: none;
+          color: #ff5b2f;
+          padding-left: 16px;
         }
 
-        .sidebar-accordion-card {
-          border: 1px solid #f1f1f1;
-          border-radius: 18px;
+        .sidebar-search .form-control {
+          background: #ffffff;
+          border: 0;
+          box-shadow: none !important;
+          outline: none !important;
+          color: #111827;
+        }
+
+        .sidebar-search .form-control:focus {
+          box-shadow: none !important;
+        }
+
+        .chat-filter-row {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+        }
+
+        .chat-filter-btn {
+          border: 1px solid #ffd7c2;
+          border-radius: 999px;
+          padding: 10px 12px;
+          background: #ffffff;
+          color: #ff5b2f;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .chat-filter-btn.active {
+          color: #ffffff;
+          background: linear-gradient(135deg, #ff9d2e, #ff5b2f);
+          box-shadow: 0 10px 20px rgba(255, 91, 47, 0.22);
+        }
+
+        .sidebar-accordion-card,
+        .search-result-card {
+          border: 1px solid #ffd9c7;
+          border-radius: 20px;
           overflow: hidden;
           background: #ffffff;
           margin: 0 12px 12px;
-          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+          box-shadow: 0 12px 28px rgba(255, 91, 47, 0.08);
         }
 
-        .sidebar-accordion-head {
+        .sidebar-accordion-head,
+        .search-result-head {
           width: 100%;
           border: 0;
           color: #ffffff;
@@ -589,16 +718,50 @@ export default function Sidebar({
         }
 
         .sidebar-chat-item {
-          transition: .18s ease;
-          border-bottom: 1px solid #f8fafc;
+          background: rgba(255, 255, 255, 0.78);
+          transition: 0.2s ease;
+          border-bottom: 1px solid #fff1e7;
         }
 
         .sidebar-chat-item:hover {
-          background: #fff7f1;
+          background: #fff1e7;
         }
 
         .sidebar-chat-item.active {
-          background: #fff1e7;
+          background: linear-gradient(135deg, #fff1e7, #ffe3d3);
+          border-left: 4px solid #ff5b2f;
+        }
+
+        .network-result-item {
+          width: 100%;
+          border: 0;
+          background: #ffffff;
+          padding: 11px 14px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          text-align: left;
+          border-bottom: 1px solid #fff1e7;
+        }
+
+        .network-result-item:hover {
+          background: #fff7f1;
+        }
+
+        .network-result-item img {
+          width: 44px;
+          height: 44px;
+          border-radius: 999px;
+          object-fit: cover;
+        }
+
+        .network-start-pill {
+          border-radius: 999px;
+          padding: 7px 12px;
+          font-size: 12px;
+          font-weight: 900;
+          color: #ffffff;
+          background: linear-gradient(135deg, #ff9d2e, #ff5b2f);
         }
 
         .empty-box {
@@ -665,10 +828,10 @@ export default function Sidebar({
         }
       `}</style>
 
-      <header className="sidebar-header d-flex align-items-center justify-content-between px-3 py-3 border-bottom">
+      <header className="sidebar-header d-flex align-items-center justify-content-between px-3 py-3">
         <div
           ref={profileMenuRef}
-          className="d-flex align-items-center gap-3 position-relative overflow-visible"
+          className="d-flex align-items-center gap-3 position-relative overflow-visible min-w-0"
         >
           <button
             type="button"
@@ -676,13 +839,15 @@ export default function Sidebar({
             className="btn p-0 border-0 rounded-circle flex-shrink-0"
             title="Profile"
           >
-            <img
-              src={getUserAvatar(currentUser)}
-              className="rounded-circle object-fit-cover"
-              width="44"
-              height="44"
-              alt="profile"
-            />
+            <span className="profile-avatar-ring d-inline-flex">
+              <img
+                src={getUserAvatar(currentUser)}
+                className="rounded-circle object-fit-cover"
+                width="44"
+                height="44"
+                alt="profile"
+              />
+            </span>
           </button>
 
           {showProfileMenu && (
@@ -691,7 +856,9 @@ export default function Sidebar({
                 type="button"
                 onClick={() => {
                   setShowProfileMenu(false);
-                  setPreviewImage(currentUser?.avatar || getUserAvatar(currentUser));
+                  setPreviewImage(
+                    currentUser?.avatar || getUserAvatar(currentUser),
+                  );
                 }}
                 className="sidebar-profile-menu-item d-flex align-items-center gap-2"
               >
@@ -736,114 +903,198 @@ export default function Sidebar({
           </div>
         </div>
 
-        <div className="d-flex align-items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowNetwork(true)}
-            className="sidebar-top-btn"
-            title="Our Network"
-            disabled={usersLoading}
-          >
-            <FaUserFriends />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowGroup(true)}
-            className="sidebar-top-btn"
-            title="Create Group"
-          >
-            <FaPlus />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowNetwork(true)}
+          className="network-svg-btn flex-shrink-0"
+          title="Our Network"
+          disabled={usersLoading}
+        >
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+            <circle cx="6" cy="7" r="3" stroke="currentColor" strokeWidth="2" />
+            <circle
+              cx="18"
+              cy="7"
+              r="3"
+              stroke="currentColor"
+              strokeWidth="2"
+            />
+            <circle
+              cx="12"
+              cy="17"
+              r="3"
+              stroke="currentColor"
+              strokeWidth="2"
+            />
+            <path
+              d="M8.5 9.5L10.5 14M15.5 9.5L13.5 14"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
       </header>
 
-      <div className="px-3 py-3">
-        <div className="input-group sidebar-search border rounded-4">
-          <span className="input-group-text">
-            <FaSearch />
-          </span>
-          <input
-            value={search}
-            onChange={(e) => {
-              const value = e.target.value;
-              setSearch(value);
-              fetchUsers(value, false);
-            }}
-            placeholder="Search user by name"
-            className="form-control"
-          />
+        <div className="p-3 search-wrapper">
+          <div className="input-group sidebar-search  border border-red-100 rounded-4">
+            <span className="input-group-text rounded-start-pill">
+              <FaSearch />
+            </span>
+
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search chats or network users..."
+              className="form-control rounded-end-pill"
+            />
+          </div>
         </div>
-      </div>
+
+      {!isSearching && (
+        <div className="chat-filter-row px-3 pb-3">
+          {[
+            { key: "all", label: "All" },
+            { key: "chats", label: "Chats" },
+            { key: "groups", label: "Groups" },
+          ].map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setActiveFilter(item.key)}
+              className={`chat-filter-btn ${
+                activeFilter === item.key ? "active" : ""
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <section className="sidebar-scroll flex-grow-1 overflow-auto pb-3">
-        <AccordionSection
-          title="Groups"
-          icon={<FaUsers />}
-          count={groupChats.length}
-          open={groupsOpen}
-          onToggle={() => setGroupsOpen((prev) => !prev)}
-          actionIcon={<FaPlus />}
-          onAction={() => setShowGroup(true)}
-        >
-          {conversationsLoading ? (
-            <SidebarSkeleton count={3} />
-          ) : groupChats.length > 0 ? (
-            groupChats.map((conversation) => renderConversationItem(conversation))
-          ) : (
-            <div className="empty-box">
-              <div className="fw-bold text-dark mb-1">No groups yet</div>
-              <div className="small text-secondary mb-3">
-                Create your first group chat.
+        {isSearching ? (
+          <>
+            <div className="search-result-card">
+              <div className="search-result-head">
+                <span>
+                  <FaComments className="me-2" />
+                  Matched Chats
+                </span>
+                <span className="badge bg-white text-dark rounded-pill">
+                  {searchedChats.length}
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowGroup(true)}
-                className="empty-action-btn "
-              >
-                <FaPlus className="me-2" />
-                Create Group
-              </button>
-            </div>
-          )}
-        </AccordionSection>
 
-        <AccordionSection
-          title="Chats"
-          icon={<FaComments />}
-          count={privateChats.length}
-          open={chatsOpen}
-          onToggle={() => setChatsOpen((prev) => !prev)}
-          actionIcon={<FaPlus />}
-          onAction={() => setShowNetwork(true)}
-        >
-          {conversationsLoading ? (
-            <SidebarSkeleton count={5} />
-          ) : privateChats.length > 0 ? (
-            privateChats.map((conversation) => renderConversationItem(conversation))
-          ) : (
-            <div className="empty-box">
-              <div className="fw-bold text-dark mb-1">No chats yet</div>
-              <div className="small text-secondary mb-3">
-                Start a new private chat.
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowNetwork(true)}
-                className="empty-action-btn"
-              >
-                <FaPlus className="me-2" />
-                New Chat
-              </button>
+              {searchedChats.length > 0 ? (
+                searchedChats.map((conversation) =>
+                  renderConversationItem(conversation),
+                )
+              ) : (
+                <div className="empty-box">No chat matched</div>
+              )}
             </div>
-          )}
-        </AccordionSection>
+
+            <div className="search-result-card">
+              <div className="search-result-head">
+                <span>
+                  <FaUserFriends className="me-2" />
+                  Matched Network
+                </span>
+                <span className="badge bg-white text-dark rounded-pill">
+                  {searchedNetworkUsers.length}
+                </span>
+              </div>
+
+              {usersLoading ? (
+                <SidebarSkeleton count={3} />
+              ) : searchedNetworkUsers.length > 0 ? (
+                searchedNetworkUsers.map((user) => renderNetworkUser(user))
+              ) : (
+                <div className="empty-box">No network user matched</div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {activeFilter !== "chats" && (
+              <AccordionSection
+                title="Groups"
+                icon={<FaUsers />}
+                count={groupChats.length}
+                open={groupsOpen}
+                onToggle={() => setGroupsOpen((prev) => !prev)}
+                actionIcon={groupChats.length > 0 ? <FaPlus /> : null}
+                onAction={() => setShowGroup(true)}
+              >
+                {conversationsLoading ? (
+                  <SidebarSkeleton count={3} />
+                ) : groupChats.length > 0 ? (
+                  groupChats.map((conversation) =>
+                    renderConversationItem(conversation),
+                  )
+                ) : (
+                  <div className="empty-box">
+                    <div className="fw-bold text-dark mb-1">No groups yet</div>
+                    <div className="small text-secondary mb-3">
+                      Create your first group chat.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowGroup(true)}
+                      className="empty-action-btn"
+                    >
+                      <FaPlus className="me-2 d-inline-block" />
+                      Create Group
+                    </button>
+                  </div>
+                )}
+              </AccordionSection>
+            )}
+
+            {activeFilter !== "groups" && (
+              <AccordionSection
+                title="Chats"
+                icon={<FaComments />}
+                count={privateChats.length}
+                open={chatsOpen}
+                onToggle={() => setChatsOpen((prev) => !prev)}
+                actionIcon={privateChats.length > 0 ? <FaPlus /> : null}
+                onAction={() => setShowNetwork(true)}
+              >
+                {conversationsLoading ? (
+                  <SidebarSkeleton count={5} />
+                ) : privateChats.length > 0 ? (
+                  privateChats.map((conversation) =>
+                    renderConversationItem(conversation),
+                  )
+                ) : (
+                  <div className="empty-box">
+                    <div className="fw-bold text-dark mb-1">No chats yet</div>
+                    <div className="small text-secondary mb-3">
+                      Start a conversation with someone.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowNetwork(true)}
+                      className="empty-action-btn"
+                    >
+                      <FaPlus className="me-2 d-inline-block" />
+                      New Chat
+                    </button>
+                  </div>
+                )}
+              </AccordionSection>
+            )}
+          </>
+        )}
       </section>
 
       {showGroup && (
         <CreateGroupModal
           currentUser={currentUser}
           users={users}
+          conversations={conversations}
           onClose={() => setShowGroup(false)}
           onCreated={(conversation) => {
             setShowGroup(false);
@@ -929,19 +1180,23 @@ function AccordionSection({
         </span>
 
         <span className="sidebar-accordion-actions">
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              onAction?.();
-            }}
-            className="accordion-action-btn"
-          >
-            {actionIcon}
-          </span>
+          {actionIcon && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAction?.();
+              }}
+              className="accordion-action-btn"
+            >
+              {actionIcon}
+            </span>
+          )}
 
-          <FaChevronDown className={`accordion-chevron ${open ? "open" : ""}`} />
+          <FaChevronDown
+            className={`accordion-chevron ${open ? "open" : ""}`}
+          />
         </span>
       </button>
 

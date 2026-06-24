@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   FaArrowLeft,
   FaPhoneAlt,
@@ -19,15 +19,24 @@ export default function ChatWindow({
   onRefreshConversations,
   onBack,
 }) {
-  
-const router = useRouter();
-const bottomRef = useRef(null);
-const chatBodyRef = useRef(null);
-const shouldScrollAfterLoadRef = useRef(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const conversationIdFromUrl = searchParams.get("conversationId");
 
+  const bottomRef = useRef(null);
+  const chatBodyRef = useRef(null);
+  const loadedConversationRef = useRef(null);
+  const fetchingMessagesRef = useRef(false);
+  const pendingMessagesRef = useRef([]);
+
+  const [activeConversation, setActiveConversation] = useState(
+    conversation || null
+  );
+  const [isHydratingConversation, setIsHydratingConversation] = useState(false);
   const [messages, setMessages] = useState([]);
   const [initialChatLoading, setInitialChatLoading] = useState(false);
-  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [showRealChat, setShowRealChat] = useState(false);
+  const [isPreparingReveal, setIsPreparingReveal] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
 
   const token =
@@ -38,112 +47,169 @@ const shouldScrollAfterLoadRef = useRef(false);
   };
 
   useEffect(() => {
-    if (!conversation?._id || !currentUser?._id) return;
-
-    setMessages([]);
-    fetchMessages(true, true);
-  }, [conversation?._id, currentUser?._id]);
+    if (conversation?._id) {
+      setActiveConversation(conversation);
+    }
+  }, [conversation?._id]);
 
   useEffect(() => {
-    if (!conversation?._id) return;
+    if (!conversationIdFromUrl) {
+      setActiveConversation(null);
+      setMessages([]);
+      setShowRealChat(false);
+      setIsPreparingReveal(false);
+      loadedConversationRef.current = null;
+      pendingMessagesRef.current = [];
+      return;
+    }
 
-    const scrollNow = () => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-  scrollToBottomHard();
-}, 50);
-        });
-      });
-    };
+    if (!currentUser?._id) return;
+    if (activeConversation?._id === conversationIdFromUrl) return;
 
-    scrollNow();
+    let cancelled = false;
 
-    window.visualViewport?.addEventListener("resize", scrollNow);
-    window.visualViewport?.addEventListener("scroll", scrollNow);
+    async function hydrateConversation() {
+      try {
+        setIsHydratingConversation(true);
+        setShowRealChat(false);
+        setIsPreparingReveal(false);
+
+        const res = await fetch(
+          `/api/conversations?userId=${currentUser._id}`,
+          { headers: authHeaders }
+        );
+
+        if (!res.ok || cancelled) return;
+
+        const result = await res.json();
+
+        const found = result?.conversations?.find(
+          (item) => item?._id === conversationIdFromUrl
+        );
+
+        if (found && !cancelled) {
+          setActiveConversation(found);
+        }
+      } catch (error) {
+        console.error("Hydrate conversation error:", error);
+      } finally {
+        if (!cancelled) setIsHydratingConversation(false);
+      }
+    }
+
+    hydrateConversation();
 
     return () => {
-      window.visualViewport?.removeEventListener("resize", scrollNow);
-      window.visualViewport?.removeEventListener("scroll", scrollNow);
+      cancelled = true;
     };
-  }, [conversation?._id, messages.length]);
+  }, [conversationIdFromUrl, currentUser?._id]);
 
   useEffect(() => {
-    if (!conversation?._id || !currentUser?._id) return;
+    if (!activeConversation?._id || !currentUser?._id) return;
+
+    const isNewConversation =
+      loadedConversationRef.current !== activeConversation._id;
+
+    if (!isNewConversation) return;
+
+    loadedConversationRef.current = activeConversation._id;
+    pendingMessagesRef.current = [];
+
+    setMessages([]);
+    setShowRealChat(false);
+    setIsPreparingReveal(false);
+    setInitialChatLoading(true);
+
+    fetchMessages(true);
+  }, [activeConversation?._id, currentUser?._id]);
+
+  useEffect(() => {
+    if (!activeConversation?._id || !currentUser?._id) return;
 
     const interval = setInterval(() => {
       fetchMessages(false);
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [conversation?._id, currentUser?._id]);
+  }, [activeConversation?._id, currentUser?._id]);
 
-  async function fetchMessages(
-    shouldScroll = true,
-    showInitialSkeleton = false,
-  ) {
+  async function fetchMessages(initialLoad = false) {
+    if (fetchingMessagesRef.current) return;
+    if (!activeConversation?._id || !currentUser?._id) return;
+
+    const conversationId = activeConversation._id;
+
     try {
-      setMessagesLoading(true);
-
-      if (showInitialSkeleton) {
-        setInitialChatLoading(true);
-      }
+      fetchingMessagesRef.current = true;
 
       const res = await fetch(
-        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-        {
-          headers: authHeaders,
-        },
+        `/api/messages?conversationId=${conversationId}&userId=${currentUser._id}`,
+        { headers: authHeaders }
       );
 
       const result = await res.json();
-      setMessages(result?.messages || []);
+      const nextMessages = result?.messages || [];
 
-      if (shouldScroll) {
-        shouldScrollAfterLoadRef.current = true;
+      if (loadedConversationRef.current !== conversationId) return;
+
+      if (initialLoad) {
+        pendingMessagesRef.current = nextMessages;
+      } else {
+        setMessages(nextMessages);
       }
     } catch (error) {
       console.error("Fetch messages error:", error);
     } finally {
-      setMessagesLoading(false);
+      fetchingMessagesRef.current = false;
 
-      if (showInitialSkeleton) {
+      if (initialLoad && loadedConversationRef.current === conversationId) {
         setTimeout(() => {
+          setMessages(pendingMessagesRef.current);
           setInitialChatLoading(false);
-        }, 250);
+          setIsPreparingReveal(true);
+        }, 180);
       }
     }
   }
 
-  useEffect(() => {
-    if (initialChatLoading) return;
-    if (!shouldScrollAfterLoadRef.current) return;
+  useLayoutEffect(() => {
+    if (!isPreparingReveal) return;
 
-    shouldScrollAfterLoadRef.current = false;
-
-    setTimeout(() => {
-      scrollToBottomHard();
-    }, 80);
-  }, [initialChatLoading, messages.length]);
-
-  function scrollToBottomHard() {
-    const body = chatBodyRef.current;
-
-    if (body) {
-      body.scrollTop = body.scrollHeight;
+    if (messages.length === 0) {
+      setIsPreparingReveal(false);
+      setShowRealChat(true);
+      return;
     }
 
-    bottomRef.current?.scrollIntoView({
-      behavior: "auto",
-      block: "end",
-    });
-  }
+    const revealAfterScroll = () => {
+      scrollToBottomHard();
+
+      requestAnimationFrame(() => {
+        scrollToBottomHard();
+
+        setTimeout(() => {
+          scrollToBottomHard();
+          setIsPreparingReveal(false);
+          setShowRealChat(true);
+        }, 40);
+      });
+    };
+
+    requestAnimationFrame(revealAfterScroll);
+  }, [isPreparingReveal, messages.length]);
+
+function scrollToBottomHard() {
+  const body = chatBodyRef.current;
+  if (!body) return;
+
+  body.scrollTop = body.scrollHeight;
+}
 
   async function sendMessage(payload = {}) {
     const token = localStorage.getItem("token");
 
     try {
-      if (!conversation?._id) {
+      if (!activeConversation?._id) {
         alert("Select chat first");
         return;
       }
@@ -154,7 +220,7 @@ const shouldScrollAfterLoadRef = useRef(false);
       }
 
       const messagePayload = {
-        conversationId: conversation._id,
+        conversationId: activeConversation._id,
         senderId: currentUser._id,
         text: payload?.text || "",
         attachments: payload?.attachments || [],
@@ -174,7 +240,7 @@ const shouldScrollAfterLoadRef = useRef(false);
         localStorage.clear();
         localStorage.setItem(
           "sessionMessage",
-          "Your session has expired. Please login again.",
+          "Your session has expired. Please login again."
         );
         router.push("/auth/login");
         return;
@@ -188,13 +254,12 @@ const shouldScrollAfterLoadRef = useRef(false);
       }
 
       setMessages((prev) => [...prev, result.message]);
+      setShowRealChat(true);
       onRefreshConversations?.();
 
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-         scrollToBottomHard();
-        });
-      });
+      setTimeout(() => {
+        scrollToBottomHard();
+      }, 30);
     } catch (error) {
       console.error("Send message error:", error);
       alert("Message send failed");
@@ -205,7 +270,7 @@ const shouldScrollAfterLoadRef = useRef(false);
     const ok = confirm(
       type === "everyone"
         ? "Delete this message for everyone?"
-        : "Delete this message for me?",
+        : "Delete this message for me?"
     );
 
     if (!ok) return;
@@ -215,7 +280,7 @@ const shouldScrollAfterLoadRef = useRef(false);
       {
         method: "DELETE",
         headers: authHeaders,
-      },
+      }
     );
 
     const result = await res.json();
@@ -226,7 +291,7 @@ const shouldScrollAfterLoadRef = useRef(false);
   }
 
   async function startCall(type) {
-    if (!conversation?._id) {
+    if (!activeConversation?._id) {
       alert("Select chat first");
       return;
     }
@@ -238,7 +303,7 @@ const shouldScrollAfterLoadRef = useRef(false);
         ...authHeaders,
       },
       body: JSON.stringify({
-        conversationId: conversation?._id,
+        conversationId: activeConversation._id,
         callerId: currentUser?._id,
         type,
       }),
@@ -252,7 +317,7 @@ const shouldScrollAfterLoadRef = useRef(false);
     }
 
     router.push(
-      `/call?room=${conversation?._id}&type=${type}&callId=${result?.call?._id}`,
+      `/call?room=${activeConversation._id}&type=${type}&callId=${result?.call?._id}`
     );
   }
 
@@ -265,33 +330,25 @@ const shouldScrollAfterLoadRef = useRef(false);
   }
 
   function getChatTitle() {
-    if (conversation?.type === "group") {
-      return conversation?.name || "Group";
+    if (activeConversation?.type === "group") {
+      return activeConversation?.name || "Group";
     }
 
-    const receiver = conversation?.members?.find(
-      (member) => member?._id !== currentUser?._id,
+    const receiver = activeConversation?.members?.find(
+      (member) => member?._id !== currentUser?._id
     );
 
     return receiver?.name || "User";
   }
 
-  if (!conversation?._id) {
-    return (
-      <main className="chat-window-shell d-none d-md-flex align-items-center justify-content-center">
-        <div className="text-center px-4">
-          <div className="display-1 mb-3">💬</div>
-          <h1 className="fw-black text-dark">ChatterBox Pro Max</h1>
-          <p className="text-secondary mt-3">
-            Select a chat, search your network, or create a group.
-          </p>
-        </div>
-      </main>
-    );
-  }
+  const loadingChat =
+    isHydratingConversation ||
+    initialChatLoading ||
+    isPreparingReveal ||
+    !showRealChat;
 
-  return (
-    <main className="chat-window-shell d-flex flex-column">
+  function renderHeader() {
+    return (
       <header className="chat-header d-flex align-items-center justify-content-between px-2 px-sm-3">
         <div className="d-flex align-items-center min-w-0">
           <button
@@ -303,58 +360,152 @@ const shouldScrollAfterLoadRef = useRef(false);
             <FaArrowLeft />
           </button>
 
-          <ChatAvatar
-            conversation={conversation}
-            currentUser={currentUser}
-            size={44}
-          />
+          {activeConversation?._id && showRealChat ? (
+            <ChatAvatar
+              conversation={activeConversation}
+              currentUser={currentUser}
+              size={44}
+            />
+          ) : (
+            <HeaderAvatarSkeleton />
+          )}
 
           <div className="ms-2 ms-sm-3 min-w-0">
-            <h6 className="mb-0 text-dark fw-bold text-truncate">
-              {getChatTitle()}
-            </h6>
-            <small className="text-secondary">
-              {conversation?.type === "group" ? "Group chat" : "Private chat"}
-            </small>
+            {activeConversation?._id && showRealChat ? (
+              <>
+                <h6 className="mb-0 text-dark fw-bold text-truncate">
+                  {getChatTitle()}
+                </h6>
+                <small className="text-secondary">
+                  {activeConversation?.type === "group"
+                    ? "Group chat"
+                    : "Private chat"}
+                </small>
+              </>
+            ) : (
+              <HeaderTextSkeleton />
+            )}
           </div>
         </div>
 
-        <div className="d-flex align-items-center gap-1 gap-sm-2">
-          <button
-            type="button"
-            onClick={() => startCall("audio")}
-            className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
-            style={{
-              background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
-            }}
-          >
-            <FaPhoneAlt />
-          </button>
+        {activeConversation?._id && showRealChat && (
+          <div className="d-flex align-items-center gap-1 gap-sm-2">
+            <button
+              type="button"
+              onClick={() => startCall("audio")}
+              className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
+              style={{
+                background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
+              }}
+            >
+              <FaPhoneAlt />
+            </button>
 
-          <button
-            type="button"
-            onClick={() => startCall("video")}
-            className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
+            <button
+              type="button"
+              onClick={() => startCall("video")}
+              className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
+              style={{
+                background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
+              }}
+            >
+              <FaVideo />
+            </button>
+          </div>
+        )}
+      </header>
+    );
+  }
+
+  if (
+    !conversationIdFromUrl &&
+    !activeConversation?._id &&
+    !isHydratingConversation
+  ) {
+    return (
+      <main className="chat-window-shell d-none d-md-flex align-items-center justify-content-center">
+        <div className="text-center px-4">
+          <div
+            className="mx-auto mb-3 rounded-circle d-flex align-items-center justify-content-center text-white"
             style={{
+              width: 90,
+              height: 90,
               background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
             }}
           >
-            <FaVideo />
-          </button>
+            💬
+          </div>
+
+          <h1 className="fw-bold text-dark">ChatterBox Pro Max</h1>
+          <p className="text-secondary mt-3">
+            Select a chat, search your network, or create a group.
+          </p>
         </div>
-      </header>
+      </main>
+    );
+  }
+
+  return (
+    <main className="chat-window-shell d-flex flex-column">
+      <style>{`
+        .chat-body {
+          position: relative;
+        }
+
+        .real-message-layer.hidden-before-reveal {
+          visibility: hidden;
+          pointer-events: none;
+        }
+
+        .chat-loading-cover {
+          position: absolute;
+          inset: 0;
+          z-index: 5;
+          background: #ffffff;
+        }
+
+        .header-skeleton,
+        .chat-message-enter {
+          animation: chatReveal 0.18s ease-out both;
+        }
+
+        .skeleton-shimmer {
+          background: linear-gradient(90deg,#fff3eb 25%,#ffd9c7 50%,#fff3eb 75%);
+          background-size: 200% 100%;
+          animation: chatShimmer 1.2s infinite;
+        }
+
+        @keyframes chatShimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
+        @keyframes chatReveal {
+          from {
+            opacity: 0;
+            transform: translateY(6px);
+          }
+
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+
+      {renderHeader()}
 
       <section
         ref={chatBodyRef}
         className="chat-body flex-grow-1 min-h-0 overflow-auto"
       >
-        {initialChatLoading ? (
-          <PremiumChatSkeleton />
-        ) : messages?.length === 0 ? (
-          <EmptyChat onQuickMessage={sendQuickMessage} title={getChatTitle()} />
-        ) : (
-          <div className="chat-message-list chat-message-enter">
-            {messages?.map((message) => (
+        {messages.length > 0 && (
+          <div
+            className={`real-message-layer chat-message-list chat-message-enter ${
+              !showRealChat ? "hidden-before-reveal" : ""
+            }`}
+          >
+            {messages.map((message) => (
               <MessageBubble
                 key={message?._id}
                 message={message}
@@ -363,14 +514,31 @@ const shouldScrollAfterLoadRef = useRef(false);
                 onPreviewImage={setPreviewImage}
               />
             ))}
-            <div ref={bottomRef} />
+
+           <div ref={bottomRef} style={{ height: 18, flexShrink: 0 }} />
+          </div>
+        )}
+
+        {showRealChat && messages.length === 0 && (
+          <EmptyChat onQuickMessage={sendQuickMessage} title={getChatTitle()} />
+        )}
+
+        {loadingChat && (
+          <div className="chat-loading-cover">
+            <PremiumChatSkeleton />
           </div>
         )}
       </section>
 
-      <div className="chat-composer-wrap">
-        <Composer onSend={sendMessage} currentUser={currentUser} />
-      </div>
+     {activeConversation?._id && (
+  <div
+    className={`chat-composer-wrap ${
+      !showRealChat ? "composer-hidden-but-space" : ""
+    }`}
+  >
+    <Composer onSend={sendMessage} currentUser={currentUser} />
+  </div>
+)}
 
       {previewImage && (
         <div
@@ -401,6 +569,30 @@ const shouldScrollAfterLoadRef = useRef(false);
   );
 }
 
+function HeaderAvatarSkeleton() {
+  return (
+    <div
+      className="rounded-circle flex-shrink-0 skeleton-shimmer header-skeleton"
+      style={{ width: 44, height: 44 }}
+    />
+  );
+}
+
+function HeaderTextSkeleton() {
+  return (
+    <div className="header-skeleton">
+      <div
+        className="rounded skeleton-shimmer mb-2"
+        style={{ width: 140, height: 14 }}
+      />
+      <div
+        className="rounded skeleton-shimmer"
+        style={{ width: 90, height: 10 }}
+      />
+    </div>
+  );
+}
+
 function PremiumChatSkeleton() {
   return (
     <div className="h-100 overflow-hidden p-3 p-sm-4">
@@ -412,32 +604,17 @@ function PremiumChatSkeleton() {
           }`}
         >
           <div
+            className="skeleton-shimmer"
             style={{
               width: item % 2 === 0 ? "220px" : "280px",
               maxWidth: "80%",
               height: item % 3 === 0 ? "90px" : "68px",
               borderRadius:
                 item % 2 === 0 ? "22px 22px 6px 22px" : "22px 22px 22px 6px",
-              background:
-                "linear-gradient(90deg,#fff3eb 25%,#ffd9c7 50%,#fff3eb 75%)",
-              backgroundSize: "200% 100%",
-              animation: "chatShimmer 1.2s infinite",
             }}
           />
         </div>
       ))}
-
-      <style>{`
-        @keyframes chatShimmer {
-          0% {
-            background-position: 200% 0;
-          }
-
-          100% {
-            background-position: -200% 0;
-          }
-        }
-      `}</style>
     </div>
   );
 }
@@ -445,7 +622,7 @@ function PremiumChatSkeleton() {
 function EmptyChat({ onQuickMessage, title }) {
   return (
     <div className="h-100 d-flex align-items-center justify-content-center text-center px-3">
-      <div className="empty-chat-card bg-white rounded-[28px] shadow-lg border border-gray-100 px-4 py-5">
+      <div className="empty-chat-card bg-white shadow-lg border px-4 py-5 rounded-4">
         <div
           className="mx-auto mb-4 rounded-circle d-flex align-items-center justify-content-center text-white"
           style={{
