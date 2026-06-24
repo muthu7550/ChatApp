@@ -166,6 +166,7 @@ export default function ChatClient() {
           currentUser={currentUser}
           conversation={selectedConversation}
           onBack={() => {
+            setSelectedConversation(null);
             setMobileChatOpen(false);
             window.history.pushState(null, "", "/chat");
           }}

@@ -563,3 +563,68 @@ button.rounded-circle {
     transform: translateX(0);
   }
 }
+
+
+.emoji-mobile-backdrop {
+  display: none;
+}
+
+.emoji-gif-popover {
+  position: absolute;
+  left: 54px;
+  bottom: calc(100% + 12px);
+  z-index: 9999;
+  width: min(360px, calc(100vw - 24px));
+  background: #ffffff;
+  border: 1px solid #f1f1f1;
+  border-radius: 22px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+}
+
+.emoji-gif-popover::after {
+  content: "";
+  position: absolute;
+  bottom: -7px;
+  left: 76px;
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  transform: rotate(45deg);
+  border-right: 1px solid #f1f1f1;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+@media (max-width: 767px) {
+  .emoji-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 9997;
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  .emoji-gif-popover {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    z-index: 9998;
+    width: calc(100vw - 28px);
+    max-width: 360px;
+    border-radius: 24px;
+  }
+
+  .emoji-gif-popover::after {
+    display: none;
+  }
+
+  .emoji-grid {
+    max-height: 260px;
+  }
+
+  .gif-grid {
+    max-height: 260px;
+  }
+}

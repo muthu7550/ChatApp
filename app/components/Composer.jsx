@@ -25,21 +25,87 @@ const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ORANGE_GRADIENT = "linear-gradient(135deg, #ff9d2e, #ff5b2f)";
 
 const EMOJIS = [
-  "😀", "😃", "😄", "😁", "😆", "😂", "🤣", "😊", "😍", "😘",
-  "😎", "🥰", "😇", "😉", "😋", "😜", "🤩", "😢", "😭", "😡",
-  "👍", "👎", "👏", "🙏", "💪", "🔥", "❤️", "💔", "💯", "🎉",
-  "✨", "⭐", "🌟", "😴", "🤔", "🙄", "😬", "😱", "🥳", "🤝",
-  "✅", "❌", "📌", "📎", "📷", "🎧", "🎮", "🍕", "☕", "🚀",
+  "😀",
+  "😃",
+  "😄",
+  "😁",
+  "😆",
+  "😂",
+  "🤣",
+  "😊",
+  "😍",
+  "😘",
+  "😎",
+  "🥰",
+  "😇",
+  "😉",
+  "😋",
+  "😜",
+  "🤩",
+  "😢",
+  "😭",
+  "😡",
+  "👍",
+  "👎",
+  "👏",
+  "🙏",
+  "💪",
+  "🔥",
+  "❤️",
+  "💔",
+  "💯",
+  "🎉",
+  "✨",
+  "⭐",
+  "🌟",
+  "😴",
+  "🤔",
+  "🙄",
+  "😬",
+  "😱",
+  "🥳",
+  "🤝",
+  "✅",
+  "❌",
+  "📌",
+  "📎",
+  "📷",
+  "🎧",
+  "🎮",
+  "🍕",
+  "☕",
+  "🚀",
 ];
 
 const GIFS = [
-  { title: "Happy", url: "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif" },
-  { title: "Laugh", url: "https://media.giphy.com/media/10JhviFuU2gWD6/giphy.gif" },
-  { title: "Wow", url: "https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif" },
-  { title: "Love", url: "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" },
-  { title: "Clap", url: "https://media.giphy.com/media/nbvFVPiEiJH6JOGIok/giphy.gif" },
-  { title: "Dance", url: "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" },
-  { title: "Yes", url: "https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif" },
+  {
+    title: "Happy",
+    url: "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif",
+  },
+  {
+    title: "Laugh",
+    url: "https://media.giphy.com/media/10JhviFuU2gWD6/giphy.gif",
+  },
+  {
+    title: "Wow",
+    url: "https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif",
+  },
+  {
+    title: "Love",
+    url: "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
+  },
+  {
+    title: "Clap",
+    url: "https://media.giphy.com/media/nbvFVPiEiJH6JOGIok/giphy.gif",
+  },
+  {
+    title: "Dance",
+    url: "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
+  },
+  {
+    title: "Yes",
+    url: "https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif",
+  },
   { title: "No", url: "https://media.giphy.com/media/d10dMmzqCYqQ0/giphy.gif" },
 ];
 
@@ -169,8 +235,6 @@ export default function Composer({ onSend, currentUser }) {
     if (!text.trim() && !pendingFile && !voiceBlob) return;
 
     try {
-      setUploading(true);
-
       let attachments = pendingFile ? [pendingFile] : [];
 
       if (voiceBlob) {
@@ -191,8 +255,6 @@ export default function Composer({ onSend, currentUser }) {
     } catch (error) {
       console.error(error);
       alert(error.message || "Send failed");
-    } finally {
-      setUploading(false);
     }
   }
 
@@ -346,7 +408,7 @@ export default function Composer({ onSend, currentUser }) {
           },
         });
       },
-      () => alert("Location permission denied")
+      () => alert("Location permission denied"),
     );
   }
 
@@ -368,12 +430,14 @@ export default function Composer({ onSend, currentUser }) {
             lng,
             label: `Live location · ${hours} hour${hours > 1 ? "s" : ""}`,
             mapUrl: `https://www.google.com/maps?q=${lat},${lng}`,
-            expiresAt: new Date(Date.now() + hours * 60 * 60 * 1000).toISOString(),
+            expiresAt: new Date(
+              Date.now() + hours * 60 * 60 * 1000,
+            ).toISOString(),
             durationHours: hours,
           },
         });
       },
-      () => alert("Location permission denied")
+      () => alert("Location permission denied"),
     );
   }
 
@@ -691,10 +755,18 @@ export default function Composer({ onSend, currentUser }) {
 
       {largeFileError && (
         <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center px-3 picker-backdrop">
-          <div className="error-modal-card text-center p-4" style={{ width: "100%", maxWidth: 420 }}>
+          <div
+            className="error-modal-card text-center p-4"
+            style={{ width: "100%", maxWidth: 420 }}
+          >
             <div
               className="mx-auto rounded-circle d-flex align-items-center justify-content-center text-danger mb-3"
-              style={{ width: 72, height: 72, fontSize: 32, background: "#fff1f2" }}
+              style={{
+                width: 72,
+                height: 72,
+                fontSize: 32,
+                background: "#fff1f2",
+              }}
             >
               <FaExclamationTriangle />
             </div>
@@ -702,7 +774,8 @@ export default function Composer({ onSend, currentUser }) {
             <h4 className="fw-bold mb-2">File Too Large</h4>
 
             <p className="text-secondary mb-3">
-              This file is {largeFileError.size} MB. Maximum allowed upload size is {largeFileError.max} MB.
+              This file is {largeFileError.size} MB. Maximum allowed upload size
+              is {largeFileError.max} MB.
             </p>
 
             <div className="bg-light rounded-4 p-3 mb-3 text-truncate small text-secondary">
@@ -744,7 +817,10 @@ export default function Composer({ onSend, currentUser }) {
 
       {uploading && (
         <div className="px-3 px-sm-4 py-3 d-flex align-items-center gap-3 border-bottom bg-white">
-          <div className="spinner-border spinner-border-sm" style={{ color: "#ff5b2f" }} />
+          <div
+            className="spinner-border spinner-border-sm"
+            style={{ color: "#ff5b2f" }}
+          />
           <span className="small fw-semibold text-secondary">
             {voiceBlob ? "Uploading voice..." : "Uploading file..."}
           </span>
@@ -797,21 +873,40 @@ export default function Composer({ onSend, currentUser }) {
         <div className="px-3 px-sm-4 pt-3">
           <div className="pending-card p-3 d-flex align-items-center gap-3 shadow-sm">
             {pendingFile?.type === "image" ? (
-              <img src={pendingFile?.url} className="rounded-4 object-fit-cover" width="58" height="58" alt={pendingFile?.name} />
+              <img
+                src={pendingFile?.url}
+                className="rounded-4 object-fit-cover"
+                width="58"
+                height="58"
+                alt={pendingFile?.name}
+              />
             ) : pendingFile?.type === "video" ? (
-              <video src={pendingFile?.url} className="rounded-4 object-fit-cover" width="58" height="58" />
+              <video
+                src={pendingFile?.url}
+                className="rounded-4 object-fit-cover"
+                width="58"
+                height="58"
+              />
             ) : pendingFile?.type === "audio" ? (
-              <div className="rounded-4 bg-white d-flex align-items-center justify-content-center" style={{ width: 58, height: 58 }}>
+              <div
+                className="rounded-4 bg-white d-flex align-items-center justify-content-center"
+                style={{ width: 58, height: 58 }}
+              >
                 <FaMicrophone style={{ color: "#ff5b2f", fontSize: 24 }} />
               </div>
             ) : (
-              <div className="rounded-4 bg-white d-flex align-items-center justify-content-center" style={{ width: 58, height: 58 }}>
+              <div
+                className="rounded-4 bg-white d-flex align-items-center justify-content-center"
+                style={{ width: 58, height: 58 }}
+              >
                 <FaFileAlt style={{ color: "#ff5b2f", fontSize: 24 }} />
               </div>
             )}
 
             <div className="flex-grow-1 overflow-hidden">
-              <div className="fw-bold text-dark text-truncate">{pendingFile?.name}</div>
+              <div className="fw-bold text-dark text-truncate">
+                {pendingFile?.name}
+              </div>
               <small className="text-secondary">Ready to send</small>
             </div>
 
@@ -829,10 +924,28 @@ export default function Composer({ onSend, currentUser }) {
 
       <div ref={attachRef} className="position-relative">
         {showAttachMenu && (
-          <div className="attach-popover position-absolute start-0 bottom-100 ms-2 ms-sm-4 mb-3">
-            <AttachItem icon={<FaImage />} label="Image / Video" accept="image/*,video/*" onChange={handleFileUpload} disabled={uploading} />
-            <AttachItem icon={<FaFileAlt />} label="Document" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onChange={handleFileUpload} disabled={uploading} />
-            <AttachItem icon={<FaMicrophone />} label="Audio File" accept="audio/*" onChange={handleFileUpload} disabled={uploading} />
+          <div className="attach-popover">
+            <AttachItem
+              icon={<FaImage />}
+              label="Image / Video"
+              accept="image/*,video/*"
+              onChange={handleFileUpload}
+              disabled={uploading}
+            />
+            <AttachItem
+              icon={<FaFileAlt />}
+              label="Document"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+              onChange={handleFileUpload}
+              disabled={uploading}
+            />
+            <AttachItem
+              icon={<FaMicrophone />}
+              label="Audio File"
+              accept="audio/*"
+              onChange={handleFileUpload}
+              disabled={uploading}
+            />
 
             <button
               type="button"
@@ -860,60 +973,81 @@ export default function Composer({ onSend, currentUser }) {
 
         <div ref={emojiGifRef} className="position-relative">
           {showEmojiGif && (
-            <div className="emoji-gif-popover position-absolute start-0 bottom-100 ms-5 mb-3">
-              <div className="p-3 border-bottom">
-                <div className="d-flex align-items-center gap-2 bg-light rounded-pill p-1">
-                  <button
-                    type="button"
-                    onClick={() => setEmojiGifTab("emoji")}
-                    className={`emoji-tab-btn flex-fill ${emojiGifTab === "emoji" ? "active" : ""}`}
-                  >
-                    😊 Emoji
-                  </button>
+            <>
+              <div
+                className="emoji-mobile-backdrop"
+                onClick={() => setShowEmojiGif(false)}
+              />
 
-                  <button
-                    type="button"
-                    onClick={() => setEmojiGifTab("gif")}
-                    className={`emoji-tab-btn flex-fill ${emojiGifTab === "gif" ? "active" : ""}`}
-                  >
-                    GIF
-                  </button>
+              <div className="emoji-gif-popover emoji-center-mobile">
+                <div className="p-3 border-bottom">
+                  <div className="d-flex align-items-center gap-2 bg-light rounded-pill p-1">
+                    <button
+                      type="button"
+                      onClick={() => setEmojiGifTab("emoji")}
+                      className={`emoji-tab-btn flex-fill ${
+                        emojiGifTab === "emoji" ? "active" : ""
+                      }`}
+                    >
+                      😊 Emoji
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEmojiGifTab("gif")}
+                      className={`emoji-tab-btn flex-fill ${
+                        emojiGifTab === "gif" ? "active" : ""
+                      }`}
+                    >
+                      GIF
+                    </button>
+                  </div>
                 </div>
+
+                {emojiGifTab === "emoji" ? (
+                  <div className="p-3">
+                    <div className="emoji-grid">
+                      {EMOJIS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => insertEmoji(emoji)}
+                          className="emoji-btn"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3">
+                    <div className="position-relative mb-3">
+                      <FaSearch className="position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary" />
+                      <input
+                        value={gifSearch}
+                        onChange={(e) => setGifSearch(e.target.value)}
+                        placeholder="Search GIF..."
+                        className="form-control emoji-search ps-5 py-2"
+                      />
+                    </div>
+
+                    <div className="gif-grid">
+                      {filteredGifs.map((gif) => (
+                        <button
+                          key={gif.url}
+                          type="button"
+                          onClick={() => sendGif(gif)}
+                          className="gif-item"
+                        >
+                          <img src={gif.url} alt={gif.title} />
+                          <span>{gif.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {emojiGifTab === "emoji" ? (
-                <div className="p-3">
-                  <div className="emoji-grid">
-                    {EMOJIS.map((emoji) => (
-                      <button key={emoji} type="button" onClick={() => insertEmoji(emoji)} className="emoji-btn">
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3">
-                  <div className="position-relative mb-3">
-                    <FaSearch className="position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary" />
-                    <input
-                      value={gifSearch}
-                      onChange={(e) => setGifSearch(e.target.value)}
-                      placeholder="Search GIF..."
-                      className="form-control emoji-search ps-5 py-2"
-                    />
-                  </div>
-
-                  <div className="gif-grid">
-                    {filteredGifs.map((gif) => (
-                      <button key={gif.url} type="button" onClick={() => sendGif(gif)} className="gif-item">
-                        <img src={gif.url} alt={gif.title} />
-                        <span>{gif.title}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            </>
           )}
 
           <footer className="px-2 px-sm-4 py-3 d-flex align-items-end gap-2">
@@ -948,14 +1082,25 @@ export default function Composer({ onSend, currentUser }) {
                 if (voiceBlob) clearVoicePreview();
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !uploading && !recording) {
+                if (
+                  e.key === "Enter" &&
+                  !e.shiftKey &&
+                  !uploading &&
+                  !recording
+                ) {
                   e.preventDefault();
                   handleSend();
                 }
               }}
               disabled={uploading || recording || voiceBlob}
               rows={1}
-              placeholder={voiceBlob ? "Voice message ready" : pendingFile ? "Add a caption..." : "Type a message"}
+              placeholder={
+                voiceBlob
+                  ? "Voice message ready"
+                  : pendingFile
+                    ? "Add a caption..."
+                    : "Type a message"
+              }
               className="form-control composer-input px-4 py-2 flex-grow-1"
             />
 
@@ -1002,11 +1147,16 @@ function LocationPickerModal({
 }) {
   return (
     <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center px-3 picker-backdrop">
-      <div className="picker-card overflow-hidden" style={{ width: "100%", maxWidth: 440 }}>
+      <div
+        className="picker-card overflow-hidden"
+        style={{ width: "100%", maxWidth: 440 }}
+      >
         <div className="p-4 border-bottom d-flex align-items-center justify-content-between">
           <div>
             <h5 className="fw-bold mb-1 text-dark">Share Location</h5>
-            <small className="text-secondary">Choose current or live location</small>
+            <small className="text-secondary">
+              Choose current or live location
+            </small>
           </div>
 
           <button
@@ -1030,12 +1180,19 @@ function LocationPickerModal({
             </span>
 
             <span>
-              <span className="d-block fw-bold text-dark">Share Current Location</span>
-              <small className="text-secondary">Send your location one time</small>
+              <span className="d-block fw-bold text-dark">
+                Share Current Location
+              </span>
+              <small className="text-secondary">
+                Send your location one time
+              </small>
             </span>
           </button>
 
-          <div className="rounded-4 p-3" style={{ background: "#f8fafc", border: "1px solid #eef2f7" }}>
+          <div
+            className="rounded-4 p-3"
+            style={{ background: "#f8fafc", border: "1px solid #eef2f7" }}
+          >
             <div className="d-flex align-items-center gap-3 mb-3">
               <span className="picker-option-icon">
                 <FaMapMarkerAlt />
@@ -1043,7 +1200,9 @@ function LocationPickerModal({
 
               <div>
                 <div className="fw-bold text-dark">Share Live Location</div>
-                <small className="text-secondary">Choose how many hours to share</small>
+                <small className="text-secondary">
+                  Choose how many hours to share
+                </small>
               </div>
             </div>
 
@@ -1055,7 +1214,8 @@ function LocationPickerModal({
                   onClick={() => setLiveLocationHours(hour)}
                   className="btn rounded-pill flex-fill fw-bold border-0"
                   style={{
-                    background: liveLocationHours === hour ? ORANGE_GRADIENT : "#fff3eb",
+                    background:
+                      liveLocationHours === hour ? ORANGE_GRADIENT : "#fff3eb",
                     color: liveLocationHours === hour ? "#ffffff" : "#ff5b2f",
                   }}
                 >
@@ -1089,11 +1249,16 @@ function ContactPickerModal({
 }) {
   return (
     <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center px-3 picker-backdrop">
-      <div className="picker-card overflow-hidden" style={{ width: "100%", maxWidth: 420 }}>
+      <div
+        className="picker-card overflow-hidden"
+        style={{ width: "100%", maxWidth: 420 }}
+      >
         <div className="p-4 border-bottom d-flex align-items-center justify-content-between">
           <div>
             <h5 className="fw-bold mb-1 text-dark">Share Contact</h5>
-            <small className="text-secondary">Send a name and phone number</small>
+            <small className="text-secondary">
+              Send a name and phone number
+            </small>
           </div>
 
           <button
@@ -1108,7 +1273,9 @@ function ContactPickerModal({
 
         <div className="p-4">
           <div className="mb-3">
-            <label className="form-label small fw-bold text-secondary">Contact Name</label>
+            <label className="form-label small fw-bold text-secondary">
+              Contact Name
+            </label>
             <div className="position-relative">
               <FaUser className="position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary" />
               <input
@@ -1121,7 +1288,9 @@ function ContactPickerModal({
           </div>
 
           <div className="mb-4">
-            <label className="form-label small fw-bold text-secondary">Phone Number</label>
+            <label className="form-label small fw-bold text-secondary">
+              Phone Number
+            </label>
             <div className="position-relative">
               <FaPhoneAlt className="position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary" />
               <input
@@ -1152,7 +1321,13 @@ function AttachItem({ icon, label, accept, onChange, disabled }) {
     <label className="attach-item d-flex align-items-center gap-3">
       <span className="attach-icon">{icon}</span>
       <span>{label}</span>
-      <input type="file" hidden disabled={disabled} onChange={onChange} accept={accept} />
+      <input
+        type="file"
+        hidden
+        disabled={disabled}
+        onChange={onChange}
+        accept={accept}
+      />
     </label>
   );
 }

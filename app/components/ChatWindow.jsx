@@ -4,17 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FaArrowLeft,
-  FaEllipsisV,
   FaPhoneAlt,
   FaVideo,
-  FaTrash,
-  FaBroom,
   FaCommentDots,
 } from "react-icons/fa";
 
 import Composer from "./Composer";
 import MessageBubble from "./MessageBubble";
-import { playNotifySound, showBrowserNotification } from "../lib/notifyClient";
 import { ChatAvatar } from "./Avatar";
 
 export default function ChatWindow({
@@ -24,6 +20,12 @@ export default function ChatWindow({
   onBack,
 }) {
   const router = useRouter();
+  const bottomRef = useRef(null);
+
+  const [messages, setMessages] = useState([]);
+  const [initialChatLoading, setInitialChatLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -32,21 +34,53 @@ export default function ChatWindow({
     Authorization: token ? `Bearer ${token}` : "",
   };
 
-  const [messages, setMessages] = useState([]);
-  const [lastMessageId, setLastMessageId] = useState(null);
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [showChatMenu, setShowChatMenu] = useState(false);
-  const [previewImage, setPreviewImage] = useState(null);
-  const bottomRef = useRef(null);
+  useEffect(() => {
+    if (!conversation?._id || !currentUser?._id) return;
+
+    setMessages([]);
+    setInitialChatLoading(true);
+    fetchMessages();
+  }, [conversation?._id, currentUser?._id]);
+
+  useEffect(() => {
+    if (!conversation?._id) return;
+
+    const scrollNow = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollToBottom(false);
+        });
+      });
+    };
+
+    scrollNow();
+
+    window.visualViewport?.addEventListener("resize", scrollNow);
+    window.visualViewport?.addEventListener("scroll", scrollNow);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", scrollNow);
+      window.visualViewport?.removeEventListener("scroll", scrollNow);
+    };
+  }, [conversation?._id, messages.length]);
 
   useEffect(() => {
     if (!conversation?._id || !currentUser?._id) return;
-    fetchMessages();
+
+    const interval = setInterval(() => {
+      fetchMessages(false);
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [conversation?._id, currentUser?._id]);
 
   async function fetchMessages(shouldScroll = true) {
     try {
       setMessagesLoading(true);
+
+      if (messages.length === 0) {
+        setInitialChatLoading(true);
+      }
 
       const res = await fetch(
         `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
@@ -58,82 +92,26 @@ export default function ChatWindow({
       const result = await res.json();
       setMessages(result?.messages || []);
 
-      setTimeout(() => {
-        if (shouldScroll) scrollToBottom(false);
-      }, 100);
+      if (shouldScroll) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            scrollToBottom(false);
+          });
+        });
+      }
     } catch (error) {
       console.error("Fetch messages error:", error);
     } finally {
       setMessagesLoading(false);
+      setInitialChatLoading(false);
     }
   }
 
-  async function deleteMessage(messageId, type = "me") {
-    const ok = confirm(
-      type === "everyone"
-        ? "Delete this message for everyone?"
-        : "Delete this message for me?",
-    );
-
-    if (!ok) return;
-
-    const res = await fetch(
-      `/api/messages/${messageId}?userId=${currentUser?._id}&type=${type}`,
-      {
-        method: "DELETE",
-        headers: authHeaders,
-      },
-    );
-
-    const result = await res.json();
-
-    if (result?.success) {
-      fetchMessages();
-    }
-  }
-
-  async function clearChat() {
-    const ok = confirm("Clear all messages in this chat?");
-    if (!ok) return;
-
-    const res = await fetch(
-      `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-      {
-        method: "DELETE",
-        headers: authHeaders,
-      },
-    );
-    const result = await res.json();
-
-    if (result?.success) {
-      setMessages([]);
-      setShowChatMenu(false);
-    }
-  }
-
-  async function deleteChat() {
-    const ok = confirm(
-      conversation?.type === "group"
-        ? "Leave/delete this group?"
-        : "Delete this chat?",
-    );
-
-    if (!ok) return;
-
-    const res = await fetch(
-      `/api/conversations?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-      {
-        method: "DELETE",
-        headers: authHeaders,
-      },
-    );
-    const result = await res.json();
-
-    if (result?.success) {
-      setShowChatMenu(false);
-      onRefreshConversations?.();
-      router.push("/chat");
-    }
+  function scrollToBottom(smooth = false) {
+    bottomRef.current?.scrollIntoView({
+      behavior: smooth ? "smooth" : "auto",
+      block: "end",
+    });
   }
 
   async function sendMessage(payload = {}) {
@@ -158,8 +136,6 @@ export default function ChatWindow({
         location: payload?.location || null,
       };
 
-      console.log("SEND MESSAGE PAYLOAD:", messagePayload);
-
       const res = await fetch("/api/messages", {
         method: "POST",
         headers: {
@@ -169,23 +145,17 @@ export default function ChatWindow({
         body: JSON.stringify(messagePayload),
       });
 
-      console.log(res, "ress");
-
       if (res.status === 401) {
         localStorage.clear();
-
         localStorage.setItem(
           "sessionMessage",
           "Your session has expired. Please login again.",
         );
-
-        router.push("/login");
+        router.push("/auth/login");
         return;
       }
 
       const result = await res.json().catch(() => null);
-
-      console.log("SEND MESSAGE RESULT:", result);
 
       if (!res.ok || !result?.success) {
         alert(result?.error || "Message send failed");
@@ -195,30 +165,44 @@ export default function ChatWindow({
       setMessages((prev) => [...prev, result.message]);
       onRefreshConversations?.();
 
-      setTimeout(() => {
-        scrollToBottom(true);
-      }, 100);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollToBottom(false);
+        });
+      });
     } catch (error) {
       console.error("Send message error:", error);
       alert("Message send failed");
     }
   }
 
-  function scrollToBottom(smooth = true) {
-    bottomRef.current?.scrollIntoView({
-      behavior: smooth ? "smooth" : "auto",
-      block: "end",
-    });
+  async function deleteMessage(messageId, type = "me") {
+    const ok = confirm(
+      type === "everyone"
+        ? "Delete this message for everyone?"
+        : "Delete this message for me?",
+    );
+
+    if (!ok) return;
+
+    const res = await fetch(
+      `/api/messages/${messageId}?userId=${currentUser?._id}&type=${type}`,
+      {
+        method: "DELETE",
+        headers: authHeaders,
+      },
+    );
+
+    const result = await res.json();
+
+    if (result?.success) {
+      fetchMessages(false);
+    }
   }
 
   async function startCall(type) {
     if (!conversation?._id) {
       alert("Select chat first");
-      return;
-    }
-
-    if (!currentUser?._id) {
-      alert("Login again");
       return;
     }
 
@@ -253,8 +237,6 @@ export default function ChatWindow({
       attachments: [],
       location: null,
     });
-
-    fetchMessages();
   }
 
   function getChatTitle() {
@@ -269,62 +251,12 @@ export default function ChatWindow({
     return receiver?.name || "User";
   }
 
-  function getChatAvatar() {
-    if (conversation?.type === "group") {
-      return (
-        conversation?.avatar ||
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-          conversation?.name || "Group",
-        )}&background=ff6b2c&color=fff`
-      );
-    }
-
-    const receiver = conversation?.members?.find(
-      (member) => member?._id !== currentUser?._id,
-    );
-
-    return (
-      receiver?.avatar ||
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        receiver?.name || "User",
-      )}&background=ff6b2c&color=fff`
-    );
-  }
-
-  useEffect(() => {
-    if (!conversation?._id || !currentUser?._id) return;
-
-    const interval = setInterval(async () => {
-      const res = await fetch(
-        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-        {
-          headers: authHeaders,
-        },
-      );
-
-      const result = await res.json();
-      const latestMessage = result?.messages?.[result?.messages?.length - 1];
-
-      setMessages(result?.messages || []);
-
-      setTimeout(() => {
-        scrollToBottom(false);
-      }, 100);
-
-      if (latestMessage?._id) {
-        setLastMessageId(latestMessage?._id);
-      }
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [conversation?._id, currentUser?._id, lastMessageId]);
-
   if (!conversation?._id) {
     return (
       <main className="chat-window-shell d-none d-md-flex align-items-center justify-content-center">
         <div className="text-center px-4">
           <div className="display-1 mb-3">💬</div>
-          <h1 className="fw-black text-dark">ChatterBox Pro Max </h1>
+          <h1 className="fw-black text-dark">ChatterBox Pro Max</h1>
           <p className="text-secondary mt-3">
             Select a chat, search your network, or create a group.
           </p>
@@ -340,7 +272,7 @@ export default function ChatWindow({
           <button
             type="button"
             onClick={onBack}
-            className="btn btn-sm  rounded-circle d-md-none me-2"
+            className="btn btn-sm rounded-circle d-md-none me-2"
             title="Back"
           >
             <FaArrowLeft />
@@ -362,16 +294,14 @@ export default function ChatWindow({
           </div>
         </div>
 
-        <div className="d-flex align-items-center gap-1 gap-sm-2 position-relative">
+        <div className="d-flex align-items-center gap-1 gap-sm-2">
           <button
             type="button"
             onClick={() => startCall("audio")}
             className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
             style={{
               background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
-              boxShadow: "0 8px 20px rgba(255, 91, 47, 0.25)",
             }}
-            title="Audio Call"
           >
             <FaPhoneAlt />
           </button>
@@ -382,9 +312,7 @@ export default function ChatWindow({
             className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
             style={{
               background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
-              boxShadow: "0 8px 20px rgba(255, 91, 47, 0.25)",
             }}
-            title="Video Call"
           >
             <FaVideo />
           </button>
@@ -392,19 +320,18 @@ export default function ChatWindow({
       </header>
 
       <section className="chat-body flex-grow-1 min-h-0 overflow-auto">
-        {messagesLoading ? (
-          <MessageSkeleton />
+        {initialChatLoading ? (
+          <PremiumChatSkeleton />
         ) : messages?.length === 0 ? (
           <EmptyChat onQuickMessage={sendQuickMessage} title={getChatTitle()} />
         ) : (
-          <div className="chat-message-list">
+          <div className="chat-message-list chat-message-enter">
             {messages?.map((message) => (
               <MessageBubble
                 key={message?._id}
                 message={message}
                 isOwnMessage={message?.sender?._id === currentUser?._id}
                 onDeleteMessage={deleteMessage}
-                MessageBubble={MessageBubble}
                 onPreviewImage={setPreviewImage}
               />
             ))}
@@ -420,9 +347,7 @@ export default function ChatWindow({
       {previewImage && (
         <div
           className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-100 d-flex align-items-center justify-content-center"
-          style={{
-            zIndex: 99999,
-          }}
+          style={{ zIndex: 99999 }}
           onClick={() => setPreviewImage(null)}
         >
           <button
@@ -448,22 +373,43 @@ export default function ChatWindow({
   );
 }
 
-function MessageSkeleton() {
+function PremiumChatSkeleton() {
   return (
-    <div className="p-3 p-sm-4">
-      {[1, 2, 3, 4, 5].map((item) => (
+    <div className="h-100 overflow-hidden p-3 p-sm-4">
+      {[1, 2, 3, 4, 5, 6, 7].map((item) => (
         <div
           key={item}
-          className={`d-flex mb-3 ${
+          className={`d-flex mb-4 ${
             item % 2 === 0 ? "justify-content-end" : ""
           }`}
         >
-          <div className="chat-skeleton-bubble">
-            <div className="chat-skeleton-line w-75" />
-            <div className="chat-skeleton-line w-50 mt-2" />
-          </div>
+          <div
+            style={{
+              width: item % 2 === 0 ? "220px" : "280px",
+              maxWidth: "80%",
+              height: item % 3 === 0 ? "90px" : "68px",
+              borderRadius:
+                item % 2 === 0 ? "22px 22px 6px 22px" : "22px 22px 22px 6px",
+              background:
+                "linear-gradient(90deg,#fff3eb 25%,#ffd9c7 50%,#fff3eb 75%)",
+              backgroundSize: "200% 100%",
+              animation: "chatShimmer 1.2s infinite",
+            }}
+          />
         </div>
       ))}
+
+      <style>{`
+        @keyframes chatShimmer {
+          0% {
+            background-position: 200% 0;
+          }
+
+          100% {
+            background-position: -200% 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -478,7 +424,6 @@ function EmptyChat({ onQuickMessage, title }) {
             width: 86,
             height: 86,
             background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
-            boxShadow: "0 18px 35px rgba(255, 91, 47, 0.28)",
             fontSize: 34,
           }}
         >
@@ -496,11 +441,7 @@ function EmptyChat({ onQuickMessage, title }) {
         </p>
 
         <div className="d-flex flex-wrap justify-content-center gap-2">
-          {[
-            "👋 Hello",
-            "😊 How are you?",
-            "🎉 Welcome",
-          ].map((message) => (
+          {["👋 Hello", "😊 How are you?", "🎉 Welcome"].map((message) => (
             <button
               key={message}
               type="button"
