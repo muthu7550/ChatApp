@@ -34,12 +34,12 @@ export default function ChatWindow({
     Authorization: token ? `Bearer ${token}` : "",
   };
 
-useEffect(() => {
-  if (!conversation?._id || !currentUser?._id) return;
+  useEffect(() => {
+    if (!conversation?._id || !currentUser?._id) return;
 
-  setMessages([]);
-  fetchMessages(true, true);
-}, [conversation?._id, currentUser?._id]);
+    setMessages([]);
+    fetchMessages(true, true);
+  }, [conversation?._id, currentUser?._id]);
 
   useEffect(() => {
     if (!conversation?._id) return;
@@ -47,7 +47,9 @@ useEffect(() => {
     const scrollNow = () => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          scrollToBottom(false);
+          setTimeout(() => {
+  scrollToBottomHard();
+}, 50);
         });
       });
     };
@@ -73,46 +75,63 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, [conversation?._id, currentUser?._id]);
 
-async function fetchMessages(shouldScroll = true, showInitialSkeleton = false) {
-  try {
-    setMessagesLoading(true);
+  async function fetchMessages(
+    shouldScroll = true,
+    showInitialSkeleton = false,
+  ) {
+    try {
+      setMessagesLoading(true);
 
-    if (showInitialSkeleton) {
-      setInitialChatLoading(true);
-    }
+      if (showInitialSkeleton) {
+        setInitialChatLoading(true);
+      }
 
-    const res = await fetch(
-      `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
-      {
-        headers: authHeaders,
-      },
-    );
+      const res = await fetch(
+        `/api/messages?conversationId=${conversation?._id}&userId=${currentUser?._id}`,
+        {
+          headers: authHeaders,
+        },
+      );
 
-    const result = await res.json();
-    setMessages(result?.messages || []);
+      const result = await res.json();
+      setMessages(result?.messages || []);
 
-    if (shouldScroll) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          scrollToBottom(false);
-        });
-      });
-    }
-  } catch (error) {
-    console.error("Fetch messages error:", error);
-  } finally {
-    setMessagesLoading(false);
+      if (shouldScroll) {
+        shouldScrollAfterLoadRef.current = true;
+      }
+    } catch (error) {
+      console.error("Fetch messages error:", error);
+    } finally {
+      setMessagesLoading(false);
 
-    if (showInitialSkeleton) {
-      setTimeout(() => {
-        setInitialChatLoading(false);
-      }, 250);
+      if (showInitialSkeleton) {
+        setTimeout(() => {
+          setInitialChatLoading(false);
+        }, 250);
+      }
     }
   }
-}
-  function scrollToBottom(smooth = false) {
+
+  useEffect(() => {
+    if (initialChatLoading) return;
+    if (!shouldScrollAfterLoadRef.current) return;
+
+    shouldScrollAfterLoadRef.current = false;
+
+    setTimeout(() => {
+      scrollToBottomHard();
+    }, 80);
+  }, [initialChatLoading, messages.length]);
+
+  function scrollToBottomHard() {
+    const body = chatBodyRef.current;
+
+    if (body) {
+      body.scrollTop = body.scrollHeight;
+    }
+
     bottomRef.current?.scrollIntoView({
-      behavior: smooth ? "smooth" : "auto",
+      behavior: "auto",
       block: "end",
     });
   }
@@ -170,7 +189,7 @@ async function fetchMessages(shouldScroll = true, showInitialSkeleton = false) {
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          scrollToBottom(false);
+         scrollToBottomHard();
         });
       });
     } catch (error) {
@@ -322,7 +341,10 @@ async function fetchMessages(shouldScroll = true, showInitialSkeleton = false) {
         </div>
       </header>
 
-      <section className="chat-body flex-grow-1 min-h-0 overflow-auto">
+      <section
+        ref={chatBodyRef}
+        className="chat-body flex-grow-1 min-h-0 overflow-auto"
+      >
         {initialChatLoading ? (
           <PremiumChatSkeleton />
         ) : messages?.length === 0 ? (
