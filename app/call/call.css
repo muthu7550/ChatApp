@@ -86,20 +86,7 @@
     max-height: 100svh !important;
   }
 
-  /* .call-page .lk-video-conference {
-    height: 100svh !important;
-    max-height: 100svh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-  } */
 
-  /* .call-page .lk-grid-layout-wrapper,
-  .call-page .lk-focus-layout-wrapper {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-  } */
 
   .call-page .lk-control-bar {
     position: fixed !important;

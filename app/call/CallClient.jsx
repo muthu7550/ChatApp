@@ -26,7 +26,7 @@ export default function CallClient() {
   const [user, setUser] = useState(null);
   const [call, setCall] = useState(null);
   const [ending, setEnding] = useState(false);
-  const [loadingText, setLoadingText] = useState("Calling...");
+  const [screenState, setScreenState] = useState("calling");
 
   const gettingTokenRef = useRef(false);
   const backToChatUrl = room ? `/chat?conversationId=${room}` : "/chat";
@@ -69,12 +69,12 @@ export default function CallClient() {
         setCall(latestCall);
 
         if (latestCall.status === "ringing") {
-          setLoadingText("Ringing...");
+          setScreenState("ringing");
           return;
         }
 
         if (latestCall.status === "accepted") {
-          setLoadingText("Connecting...");
+          setScreenState("connecting");
           await getLiveKitToken();
           return;
         }
@@ -178,7 +178,7 @@ export default function CallClient() {
   async function callAgain() {
     setError("");
     setToken("");
-    setLoadingText("Calling...");
+    setScreenState("calling");
     gettingTokenRef.current = false;
 
     const authToken = localStorage.getItem("token");
@@ -271,12 +271,14 @@ export default function CallClient() {
   }
 
   if (!token) {
+    const isConnecting = screenState === "connecting";
+
     return (
       <main className="call-loading-page">
         <CallStyle />
 
         <div className="outgoing-call-card">
-          <div className="outgoing-avatar-ring">
+          <div className={isConnecting ? "connecting-avatar-ring" : "outgoing-avatar-ring"}>
             <img src={getAvatar(otherPerson, user)} alt="call dp" />
           </div>
 
@@ -284,8 +286,13 @@ export default function CallClient() {
             {type === "video" ? "Video Call" : "Audio Call"}
           </div>
 
-          <h1>{otherPerson?.name || "Calling..."}</h1>
-          <p>{loadingText}</p>
+          <h1>{otherPerson?.name || (isConnecting ? "Connecting..." : "Calling...")}</h1>
+
+          <p>
+            {isConnecting
+              ? "Call accepted. Connecting to secure room..."
+              : "Ringing..."}
+          </p>
 
           <div className="ring-dots">
             <span />
@@ -293,14 +300,16 @@ export default function CallClient() {
             <span />
           </div>
 
-          <button
-            type="button"
-            className="cancel-call-btn"
-            onClick={endCall}
-            disabled={ending}
-          >
-            {ending ? "Ending..." : "Cancel Call"}
-          </button>
+          {!isConnecting && (
+            <button
+              type="button"
+              className="cancel-call-btn"
+              onClick={endCall}
+              disabled={ending}
+            >
+              {ending ? "Ending..." : "Cancel Call"}
+            </button>
+          )}
         </div>
       </main>
     );
@@ -330,20 +339,35 @@ export default function CallClient() {
 function CustomCallStage({ currentUser, otherPerson, type }) {
   const tracks = useTracks(
     [
-      {
-        source: Track.Source.Camera,
-        withPlaceholder: true,
-      },
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.Microphone, withPlaceholder: false },
     ],
-    {
-      onlySubscribed: false,
-    }
+    { onlySubscribed: false }
   );
+
+  const cameraTracks = tracks.filter(
+    (track) => track.source === Track.Source.Camera
+  );
+
+  const micTracks = tracks.filter(
+    (track) => track.source === Track.Source.Microphone
+  );
+
+  function isParticipantSpeaking(participant) {
+    if (!participant) return false;
+
+    const micTrack = micTracks.find(
+      (track) => track.participant?.identity === participant.identity
+    );
+
+    const micMuted = micTrack?.publication?.isMuted;
+    return Boolean(participant.isSpeaking && !micMuted);
+  }
 
   return (
     <div className="custom-call-stage">
       <div className="call-grid">
-        {tracks.map((trackRef) => {
+        {cameraTracks.map((trackRef) => {
           const participantId = trackRef?.participant?.identity;
           const isMe = participantId === currentUser?._id;
           const person = isMe ? currentUser : otherPerson;
@@ -353,16 +377,21 @@ function CustomCallStage({ currentUser, otherPerson, type }) {
             trackRef?.publication?.isSubscribed &&
             !trackRef?.publication?.isMuted;
 
+          const speaking = isParticipantSpeaking(trackRef?.participant);
+
           return (
-            <div key={participantId || Math.random()} className="custom-call-tile">
+            <div key={participantId || trackRef?.participant?.sid} className="custom-call-tile">
               {hasVideo ? (
-                <ParticipantTile trackRef={trackRef} />
+                <div className={speaking ? "video-speaking-border" : "video-normal-border"}>
+                  <ParticipantTile trackRef={trackRef} />
+                </div>
               ) : (
-                <ProfilePlaceholder person={person} isSpeaking />
+                <ProfilePlaceholder person={person} isSpeaking={speaking} />
               )}
 
               <div className="custom-call-name">
                 {person?.name || (isMe ? "You" : "User")}
+                {speaking ? <span className="speaking-dot"> speaking</span> : null}
               </div>
             </div>
           );
@@ -370,7 +399,7 @@ function CustomCallStage({ currentUser, otherPerson, type }) {
       </div>
 
       <div className="call-top-profile">
-        <div className="mini-speaking-ring">
+        <div className="mini-profile-ring">
           <img src={getAvatar(otherPerson, currentUser)} alt="profile" />
         </div>
 
@@ -393,7 +422,7 @@ function ProfilePlaceholder({ person, isSpeaking }) {
       </div>
 
       <h2>{person?.name || "User"}</h2>
-      <p>Camera off</p>
+      <p>{isSpeaking ? "Speaking..." : "Mic silent"}</p>
     </div>
   );
 }
@@ -431,9 +460,7 @@ function CallStyle() {
         position: relative;
         border-radius: 18px;
         overflow: hidden;
-        background:
-          radial-gradient(circle at center, rgba(255,91,47,.12), transparent 38%),
-          #171717;
+        background: radial-gradient(circle at center, rgba(255,91,47,.12), transparent 38%), #171717;
         min-height: 260px;
       }
 
@@ -441,6 +468,20 @@ function CallStyle() {
         width: 100%;
         height: 100%;
         background: #111 !important;
+      }
+
+      .video-speaking-border {
+        width: 100%;
+        height: 100%;
+        border: 3px solid #22c55e;
+        border-radius: 18px;
+        overflow: hidden;
+        animation: videoSpeakPulse 1.15s infinite;
+      }
+
+      .video-normal-border {
+        width: 100%;
+        height: 100%;
       }
 
       .custom-call-name {
@@ -453,7 +494,12 @@ function CallStyle() {
         font-weight: 900;
         padding: 6px 10px;
         border-radius: 999px;
-        background: rgba(0,0,0,.55);
+        background: rgba(0,0,0,.58);
+      }
+
+      .speaking-dot {
+        color: #22c55e;
+        margin-left: 6px;
       }
 
       .profile-placeholder {
@@ -480,8 +526,9 @@ function CallStyle() {
 
       .big-speaking-ring img,
       .big-profile-ring img,
-      .mini-speaking-ring img,
-      .outgoing-avatar-ring img {
+      .mini-profile-ring img,
+      .outgoing-avatar-ring img,
+      .connecting-avatar-ring img {
         width: 100%;
         height: 100%;
         border-radius: 999px;
@@ -516,14 +563,13 @@ function CallStyle() {
         backdrop-filter: blur(12px);
       }
 
-      .mini-speaking-ring {
+      .mini-profile-ring {
         width: 48px;
         height: 48px;
         min-width: 48px;
         padding: 3px;
         border-radius: 999px;
         background: linear-gradient(135deg,#ff9d2e,#ff5b2f);
-        animation: speakingPulse 1.2s infinite;
       }
 
       .call-top-profile strong,
@@ -559,14 +605,22 @@ function CallStyle() {
         box-shadow: 0 30px 100px rgba(0,0,0,.35);
       }
 
-      .outgoing-avatar-ring {
+      .outgoing-avatar-ring,
+      .connecting-avatar-ring {
         width: 116px;
         height: 116px;
         margin: 0 auto 18px;
         padding: 5px;
         border-radius: 999px;
         background: linear-gradient(135deg,#ff9d2e,#ff5b2f);
+      }
+
+      .outgoing-avatar-ring {
         animation: callPulse 1.3s infinite;
+      }
+
+      .connecting-avatar-ring {
+        animation: connectingPulse 1s infinite;
       }
 
       .call-type-label {
@@ -700,16 +754,23 @@ function CallStyle() {
         100% { box-shadow: 0 0 0 0 rgba(255,91,47,0); }
       }
 
-      @keyframes speakingPulse {
-        0% { box-shadow: 0 0 0 0 rgba(34,197,94,.55); }
-        70% { box-shadow: 0 0 0 12px rgba(34,197,94,0); }
-        100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+      @keyframes connectingPulse {
+        0% { box-shadow: 0 0 0 0 rgba(34,197,94,.45); transform: scale(1); }
+        50% { transform: scale(1.04); }
+        70% { box-shadow: 0 0 0 24px rgba(34,197,94,0); }
+        100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); transform: scale(1); }
       }
 
       @keyframes speakingPulseBig {
-        0% { box-shadow: 0 0 0 0 rgba(255,91,47,.42); }
-        70% { box-shadow: 0 0 0 34px rgba(255,91,47,0); }
-        100% { box-shadow: 0 0 0 0 rgba(255,91,47,0); }
+        0% { box-shadow: 0 0 0 0 rgba(34,197,94,.42); }
+        70% { box-shadow: 0 0 0 34px rgba(34,197,94,0); }
+        100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+      }
+
+      @keyframes videoSpeakPulse {
+        0% { box-shadow: inset 0 0 0 0 rgba(34,197,94,.4); }
+        70% { box-shadow: inset 0 0 0 8px rgba(34,197,94,0); }
+        100% { box-shadow: inset 0 0 0 0 rgba(34,197,94,0); }
       }
 
       @keyframes dotBounce {
