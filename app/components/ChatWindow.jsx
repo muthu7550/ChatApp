@@ -23,15 +23,14 @@ export default function ChatWindow({
   const searchParams = useSearchParams();
   const conversationIdFromUrl = searchParams.get("conversationId");
 
-  const bottomRef = useRef(null);
   const chatBodyRef = useRef(null);
+  const messageListRef = useRef(null);
   const loadedConversationRef = useRef(null);
   const fetchingMessagesRef = useRef(false);
   const pendingMessagesRef = useRef([]);
+  const bottomLockTimerRef = useRef(null);
 
-  const [activeConversation, setActiveConversation] = useState(
-    conversation || null
-  );
+  const [activeConversation, setActiveConversation] = useState(conversation || null);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
   const [messages, setMessages] = useState([]);
   const [initialChatLoading, setInitialChatLoading] = useState(false);
@@ -128,7 +127,7 @@ export default function ChatWindow({
 
     const interval = setInterval(() => {
       fetchMessages(false);
-    }, 10000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [activeConversation?._id, currentUser?._id]);
@@ -156,6 +155,7 @@ export default function ChatWindow({
         pendingMessagesRef.current = nextMessages;
       } else {
         setMessages(nextMessages);
+        requestAnimationFrame(() => scrollToBottomHard());
       }
     } catch (error) {
       console.error("Fetch messages error:", error);
@@ -181,29 +181,62 @@ export default function ChatWindow({
       return;
     }
 
-    const revealAfterScroll = () => {
+    requestAnimationFrame(() => {
       scrollToBottomHard();
 
       requestAnimationFrame(() => {
         scrollToBottomHard();
 
-        setTimeout(() => {
-          scrollToBottomHard();
-          setIsPreparingReveal(false);
-          setShowRealChat(true);
-        }, 40);
-      });
-    };
+        setShowRealChat(true);
+        setIsPreparingReveal(false);
 
-    requestAnimationFrame(revealAfterScroll);
+        lockBottomForAWhile();
+      });
+    });
   }, [isPreparingReveal, messages.length]);
 
-function scrollToBottomHard() {
-  const body = chatBodyRef.current;
-  if (!body) return;
+  useEffect(() => {
+    if (!showRealChat) return;
+    if (!chatBodyRef.current) return;
 
-  body.scrollTop = body.scrollHeight;
-}
+    const body = chatBodyRef.current;
+
+    const observer = new ResizeObserver(() => {
+      scrollToBottomHard();
+    });
+
+    observer.observe(body);
+
+    if (messageListRef.current) {
+      observer.observe(messageListRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [showRealChat, activeConversation?._id]);
+
+  function lockBottomForAWhile() {
+    if (bottomLockTimerRef.current) {
+      clearInterval(bottomLockTimerRef.current);
+    }
+
+    const start = Date.now();
+
+    bottomLockTimerRef.current = setInterval(() => {
+      scrollToBottomHard();
+
+      if (Date.now() - start > 1200) {
+        clearInterval(bottomLockTimerRef.current);
+        bottomLockTimerRef.current = null;
+      }
+    }, 80);
+  }
+
+  function scrollToBottomHard() {
+    const body = chatBodyRef.current;
+    if (!body) return;
+
+    body.scrollTop = body.scrollHeight;
+  }
 
   async function sendMessage(payload = {}) {
     const token = localStorage.getItem("token");
@@ -259,6 +292,7 @@ function scrollToBottomHard() {
 
       setTimeout(() => {
         scrollToBottomHard();
+        lockBottomForAWhile();
       }, 30);
     } catch (error) {
       console.error("Send message error:", error);
@@ -450,6 +484,7 @@ function scrollToBottomHard() {
       <style>{`
         .chat-body {
           position: relative;
+          overflow-anchor: none;
         }
 
         .real-message-layer.hidden-before-reveal {
@@ -462,6 +497,21 @@ function scrollToBottomHard() {
           inset: 0;
           z-index: 5;
           background: #ffffff;
+        }
+
+        .real-message-layer {
+          min-height: auto !important;
+          padding-bottom: 8px !important;
+        }
+
+        .composer-hidden-but-space {
+          visibility: hidden;
+          pointer-events: none;
+        }
+
+        .chat-composer-wrap {
+          flex: 0 0 auto;
+          min-height: 76px;
         }
 
         .header-skeleton,
@@ -501,6 +551,7 @@ function scrollToBottomHard() {
       >
         {messages.length > 0 && (
           <div
+            ref={messageListRef}
             className={`real-message-layer chat-message-list chat-message-enter ${
               !showRealChat ? "hidden-before-reveal" : ""
             }`}
@@ -514,8 +565,6 @@ function scrollToBottomHard() {
                 onPreviewImage={setPreviewImage}
               />
             ))}
-
-           <div ref={bottomRef} style={{ height: 18, flexShrink: 0 }} />
           </div>
         )}
 
@@ -530,15 +579,15 @@ function scrollToBottomHard() {
         )}
       </section>
 
-     {activeConversation?._id && (
-  <div
-    className={`chat-composer-wrap ${
-      !showRealChat ? "composer-hidden-but-space" : ""
-    }`}
-  >
-    <Composer onSend={sendMessage} currentUser={currentUser} />
-  </div>
-)}
+      {activeConversation?._id && (
+        <div
+          className={`chat-composer-wrap ${
+            !showRealChat ? "composer-hidden-but-space" : ""
+          }`}
+        >
+          <Composer onSend={sendMessage} currentUser={currentUser} />
+        </div>
+      )}
 
       {previewImage && (
         <div
