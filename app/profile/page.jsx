@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Cropper from "react-easy-crop";
+import "bootstrap/dist/css/bootstrap.min.css";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -12,8 +13,8 @@ export default function ProfilePage() {
 
   const [user, setUser] = useState(null);
   const [form, setForm] = useState({ name: "", about: "", avatar: "" });
-
   const [uploading, setUploading] = useState(false);
+  const [showPhotoMenu, setShowPhotoMenu] = useState(false);
 
   const [imageSrc, setImageSrc] = useState(null);
   const [showCropper, setShowCropper] = useState(false);
@@ -25,11 +26,12 @@ export default function ProfilePage() {
     const storedUser = JSON.parse(localStorage.getItem("user") || "null");
 
     if (!storedUser?._id) {
-      router.push("/login");
+      router.push("/auth/login");
       return;
     }
 
     setUser(storedUser);
+
     setForm({
       name: storedUser?.name || "",
       about: storedUser?.about || "Hey there! I am using ChatterBox 😂",
@@ -39,6 +41,7 @@ export default function ProfilePage() {
 
   function handleRemovePhoto() {
     setForm((prev) => ({ ...prev, avatar: "" }));
+    setShowPhotoMenu(false);
   }
 
   function handleSelectImage(e) {
@@ -50,6 +53,7 @@ export default function ProfilePage() {
     reader.onload = () => {
       setImageSrc(reader.result);
       setShowCropper(true);
+      setShowPhotoMenu(false);
       e.target.value = "";
     };
 
@@ -67,19 +71,18 @@ export default function ProfilePage() {
 
     try {
       const blob = await getCroppedBlob(imageSrc, croppedAreaPixels);
-
-      const file = new File([blob], "profile.jpg", {
-        type: "image/jpeg",
-      });
+      const file = new File([blob], "profile.jpg", { type: "image/jpeg" });
 
       const formData = new FormData();
       formData.append("file", file);
+
       const token = localStorage.getItem("token");
+
       const res = await fetch("/api/upload", {
         method: "POST",
-         headers: {
-    Authorization: token ? `Bearer ${token}` : "",
-  },
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
         body: formData,
       });
 
@@ -90,11 +93,7 @@ export default function ProfilePage() {
         return;
       }
 
-      setForm((prev) => ({
-        ...prev,
-        avatar: result.url,
-      }));
-
+      setForm((prev) => ({ ...prev, avatar: result.url }));
       setShowCropper(false);
       setImageSrc(null);
     } catch (error) {
@@ -107,19 +106,25 @@ export default function ProfilePage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+
+    if (!form.name.trim()) {
+      alert("Name is required");
+      return;
+    }
+
     const token = localStorage.getItem("token");
 
     const res = await fetch("/api/profile", {
       method: "PUT",
-       headers: {
-    "Content-Type": "application/json",
-    Authorization: token ? `Bearer ${token}` : "",
-  },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
       body: JSON.stringify({
         userId: user?._id,
-        name: form?.name,
-        about: form?.about,
-        avatar: form?.avatar,
+        name: form.name,
+        about: form.about,
+        avatar: form.avatar,
       }),
     });
 
@@ -130,101 +135,182 @@ export default function ProfilePage() {
       return;
     }
 
-    localStorage.setItem("user", JSON.stringify(result?.user));
+    localStorage.setItem("user", JSON.stringify(result.user));
     router.push("/chat");
   }
 
   return (
-    <main className="min-h-screen bg-[#0b141a] text-dark flex items-center justify-center px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md bg-[#111b21] rounded-3xl p-8 space-y-5 shadow-2xl"
-      >
-        <h1 className="text-3xl font-black text-center">Setup Profile 😂</h1>
-
-        <div className="flex flex-col items-center gap-3">
-          <img
-            src={
-              form?.avatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                form?.name || "User"
-              )}&background=00a884&color=fff`
-            }
-            className="w-32 h-32 rounded-full mx-auto object-cover border-4 border-emerald-500"
-            alt="profile"
-          />
-
-          <div className="flex gap-3 justify-center mt-4 flex-wrap">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="bg-emerald-500 text-black px-5 py-2 rounded-xl font-bold rounded"
+    <main className="min-vh-100 d-flex align-items-center justify-content-center px-3 py-4 bg-[linear-gradient(135deg,#ff9d2e,#ff5b2f)]">
+      <div className="container">
+        <div className="row justify-content-center">
+          <div className="col-12 col-sm-10 col-md-7 col-lg-5">
+            <form
+              onSubmit={handleSubmit}
+              className="bg-white rounded-4 shadow-lg p-4 p-sm-5"
             >
-              Gallery
-            </button>
+              <div className="text-center mb-4">
+                <h1 className="fw-black text-dark mb-2 fs-2">
+                  Setup Profile
+                </h1>
+                <p className="text-secondary mb-0 small">
+                  Add your photo and details to continue.
+                </p>
+              </div>
 
-            <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
-              className="bg-blue-500 text-dark px-5 py-2 rounded-xl font-bold rounded"
-            >
-              Camera
-            </button>
+              <div className="d-flex justify-content-center mb-4">
+                <button
+                  type="button"
+                  onClick={() => setShowPhotoMenu(true)}
+                  className="border-0 bg-transparent p-0 position-relative"
+                >
+                  <img
+                    src={
+                      form.avatar ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        form.name || "User"
+                      )}&background=ff5b2f&color=fff`
+                    }
+                    alt="profile"
+                    className="rounded-circle object-fit-cover shadow"
+                    style={{
+                      width: "132px",
+                      height: "132px",
+                      border: "5px solid #fff3ec",
+                    }}
+                  />
 
-            <button
-              type="button"
-              onClick={handleRemovePhoto}
-              className="btn btn-danger"
-              disabled={!form?.avatar}
-            >
-              Remove
-            </button>
+                  <span
+                    className="position-absolute bottom-0 end-0 d-flex align-items-center justify-content-center rounded-circle bg-warning text-white shadow"
+                    style={{
+                      width: "42px",
+                      height: "42px",
+                      border: "4px solid white",
+                    }}
+                  >
+                    📷
+                  </span>
+                </button>
+              </div>
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              hidden
-              accept="image/*"
-              onChange={handleSelectImage}
-            />
+              <div className="mb-3">
+                <label className="form-label fw-bold small text-dark">
+                  Full Name
+                </label>
+                <input
+                  className="form-control form-control-lg rounded-3 border-warning-subtle bg-warning-subtle bg-opacity-25"
+                  placeholder="Enter your name"
+                  value={form.name}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      name: e.target.value,
+                    })
+                  }
+                />
+              </div>
 
-            <input
-              ref={cameraInputRef}
-              type="file"
-              hidden
-              accept="image/*"
-              capture="user"
-              onChange={handleSelectImage}
-            />
+              <div className="mb-4">
+                <label className="form-label fw-bold small text-dark">
+                  About
+                </label>
+                <textarea
+                  className="form-control rounded-3 border-warning-subtle bg-warning-subtle bg-opacity-25"
+                  placeholder="Tell something about yourself..."
+                  value={form.about}
+                  rows={4}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      about: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={uploading}
+                className="btn w-100 rounded-3 py-3 fw-bold text-white border-0"
+                style={{
+                  background: "linear-gradient(135deg,#ff9d2e,#ff5b2f)",
+                }}
+              >
+                {uploading ? "Uploading..." : "Continue to Chat"}
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                hidden
+                accept="image/*"
+                onChange={handleSelectImage}
+              />
+
+              <input
+                ref={cameraInputRef}
+                type="file"
+                hidden
+                accept="image/*"
+                capture="user"
+                onChange={handleSelectImage}
+              />
+            </form>
           </div>
         </div>
+      </div>
 
-        <input
-          className="w-full bg-[#202c33] p-3 rounded-xl outline-none"
-          placeholder="Your name"
-          value={form?.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
+      {showPhotoMenu && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-50 d-flex align-items-end align-items-sm-center justify-content-center p-3 z-3">
+          <div
+            className="bg-white rounded-4 shadow-lg w-100 p-4"
+            style={{ maxWidth: "420px" }}
+          >
+            <div className="d-flex align-items-center justify-content-between mb-3">
+              <h5 className="fw-black mb-0 text-dark">Profile Photo</h5>
 
-        <textarea
-          className="w-full bg-[#202c33] p-3 rounded-xl outline-none min-h-[100px]"
-          placeholder="About"
-          value={form?.about}
-          onChange={(e) => setForm({ ...form, about: e.target.value })}
-        />
+              <button
+                type="button"
+                onClick={() => setShowPhotoMenu(false)}
+                className="btn-close"
+              />
+            </div>
 
-        <button
-          type="submit"
-          disabled={uploading}
-          className="w-full bg-emerald-500 text-black font-bold p-3 rounded-xl disabled:opacity-60"
-        >
-          {uploading ? "Uploading..." : "Continue to Chat"}
-        </button>
-      </form>
+            <div className="d-grid gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="btn btn-light border rounded-3 p-3 text-start fw-bold d-flex align-items-center gap-3"
+              >
+                <span className="fs-4 flex-shrink-0">🖼️</span>
+                <span className="text-nowrap">Choose from Gallery</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="btn btn-light border rounded-3 p-3 text-start fw-bold d-flex align-items-center gap-3"
+              >
+                <span className="fs-4 flex-shrink-0">📷</span>
+                <span className="text-nowrap">Open Camera</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRemovePhoto}
+                disabled={!form.avatar}
+                className="btn btn-light border rounded-3 p-3 text-start fw-bold d-flex align-items-center gap-3 text-danger"
+              >
+                <span className="fs-4 flex-shrink-0">🗑️</span>
+                <span className="text-nowrap">Remove Photo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showCropper && (
-        <div className="fixed inset-0 z-[9999] bg-black/90 flex flex-col">
-          <div className="relative flex-1">
+        <div className="position-fixed top-0 start-0 w-100 h-100 bg-black d-flex flex-column z-3">
+          <div className="position-relative flex-grow-1">
             <Cropper
               image={imageSrc}
               crop={crop}
@@ -238,7 +324,9 @@ export default function ProfilePage() {
             />
           </div>
 
-          <div className="bg-[#111b21] p-4 space-y-4">
+          <div className="bg-white p-3 p-sm-4">
+            <label className="form-label fw-bold text-dark">Zoom</label>
+
             <input
               type="range"
               min={1}
@@ -246,29 +334,37 @@ export default function ProfilePage() {
               step={0.1}
               value={zoom}
               onChange={(e) => setZoom(Number(e.target.value))}
-              className="w-full"
+              className="form-range"
             />
 
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCropper(false);
-                  setImageSrc(null);
-                }}
-                className="flex-1 bg-zinc-700 text-dark p-3 rounded-xl font-bold"
-              >
-                Cancel
-              </button>
+            <div className="row g-3 mt-2">
+              <div className="col-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCropper(false);
+                    setImageSrc(null);
+                  }}
+                  className="btn btn-light border w-100 rounded-3 py-3 fw-bold"
+                >
+                  Cancel
+                </button>
+              </div>
 
-              <button
-                type="button"
-                onClick={createCroppedImage}
-                disabled={uploading}
-                className="flex-1 bg-emerald-500 text-black p-3 rounded-xl font-bold disabled:opacity-60"
-              >
-                {uploading ? "Uploading..." : "Crop & Upload"}
-              </button>
+              <div className="col-6">
+                <button
+                  type="button"
+                  onClick={createCroppedImage}
+                  disabled={uploading}
+                  className="btn w-100 rounded-3 py-3 fw-bold text-white border-0"
+                  style={{
+                    background:
+                      "linear-gradient(135deg,#ff9d2e,#ff5b2f)",
+                  }}
+                >
+                  {uploading ? "Uploading..." : "Upload"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -304,12 +400,8 @@ function getCroppedBlob(imageSrc, crop) {
 
       canvas.toBlob(
         (blob) => {
-          if (!blob) {
-            reject(new Error("Canvas is empty"));
-            return;
-          }
-
-          resolve(blob);
+          if (!blob) reject(new Error("Canvas is empty"));
+          else resolve(blob);
         },
         "image/jpeg",
         0.9

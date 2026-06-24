@@ -63,7 +63,7 @@ export default function Sidebar({
         "sessionMessage",
         "Your session has expired. Please login again.",
       );
-      router.push("/login");
+      router.push("/auth/login");
       return true;
     }
 
@@ -250,9 +250,11 @@ export default function Sidebar({
 
       router.push(`/chat?conversationId=${result?.conversation?._id}`);
 
-      setTimeout(() => {
-        fetchConversations(true);
-      }, 300);
+// inside startDirectChat timeout
+setTimeout(() => {
+  fetchConversations(false);
+}, 300);
+
     } catch (error) {
       console.error("Start direct chat error:", error);
       alert("Something went wrong");
@@ -275,12 +277,14 @@ export default function Sidebar({
 
     const result = await res.json();
 
-    if (result?.success) {
-      onRefresh?.();
-      onSelectConversation(null);
-      router.push("/chat");
-      fetchConversations(true);
-    }
+// inside deleteConversation success
+if (result?.success) {
+  onRefresh?.();
+  onSelectConversation(null);
+  setMobileChatOpen?.(false);
+  router.push("/chat");
+  fetchConversations(false);
+}
   }
 
   function handleEditProfile() {
@@ -291,7 +295,7 @@ export default function Sidebar({
   function handleLogout() {
     localStorage.clear();
     document.cookie = "token=; path=/; max-age=0";
-    router.push("/login");
+    router.push("/auth/login");
   }
 
   async function handleDeleteAccount() {
@@ -322,7 +326,7 @@ export default function Sidebar({
       document.cookie = "token=; path=/; max-age=0";
 
       alert("Account deleted successfully");
-      router.replace("/login");
+      router.replace("/auth/login");
     } catch (error) {
       console.error(error);
       alert("Delete failed");
@@ -384,25 +388,27 @@ export default function Sidebar({
     return getUserAvatar(receiver);
   }
 
-  async function handleConversationClick(conversation) {
-    const res = await fetch("/api/messages/read", {
-      method: "POST",
-      headers: getAuthHeaders({
-        "Content-Type": "application/json",
-      }),
-      body: JSON.stringify({
-        conversationId: conversation?._id,
-        userId: currentUser?._id,
-      }),
-    });
+// handleConversationClick
+async function handleConversationClick(conversation) {
+  const res = await fetch("/api/messages/read", {
+    method: "POST",
+    headers: getAuthHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({
+      conversationId: conversation?._id,
+      userId: currentUser?._id,
+    }),
+  });
 
-    if (await handleUnauthorized(res)) return;
+  if (await handleUnauthorized(res)) return;
 
-    onSelectConversation(conversation);
-    setMobileChatOpen?.(true);
-    router.push(`/chat?conversationId=${conversation?._id}`);
-    fetchConversations(true);
-  }
+  onSelectConversation(conversation);
+  setMobileChatOpen?.(true);
+  router.push(`/chat?conversationId=${conversation?._id}`);
+
+  fetchConversations(false);
+}
 
   function renderConversationItem(conversation) {
     const active = selectedConversation?._id === conversation?._id;

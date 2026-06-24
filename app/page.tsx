@@ -2,34 +2,56 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-zinc-950 text-dark flex items-center justify-center px-6">
-      <section className="max-w-4xl text-center">
-        <div className="inline-flex rounded-full border border-emerald-400/30 px-4 py-2 text-emerald-300 mb-6">
-          WhatsApp ah? illa boss... ChatterBox Pro Max
+    <main className="min-h-screen bg-[linear-gradient(135deg,#ff9d2e,#ff5b2f)] px-4 py-5">
+      <nav className="mx-auto flex w-full max-w-5xl items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-orange-500 font-black text-white">
+            C
+          </div>
+          <h1 className="m-0 text-lg font-black text-zinc-900 sm:text-xl">
+            ChatterBox
+          </h1>
         </div>
 
-        <h1 className="text-5xl md:text-7xl font-black tracking-tight">
-          Real-time chat, calls, files, location — all in one.
-        </h1>
+        <Link
+          href="/auth/login"
+          className="rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-bold text-white no-underline"
+        >
+          Login
+        </Link>
+      </nav>
 
-        <p className="mt-6 text-zinc-400 text-lg">
-          Production-ready chat app with MongoDB, LiveKit, file uploads,
-          realtime messaging, video call, audio call and clean architecture.
+      <section className="mx-auto flex min-h-[calc(100vh-90px)] w-full max-w-5xl flex-col items-center justify-center text-center text-white">
+        <div className="mb-6 grid h-20 w-20 place-items-center rounded-3xl bg-white text-4xl font-black text-orange-500 shadow-xl">
+          C
+        </div>
+
+        <p className="mb-4 rounded-full bg-white/20 px-4 py-2 text-sm font-bold">
+          Chat • Call • Share
         </p>
 
-        <div className="mt-8 flex gap-4 justify-center">
+        <h2 className="max-w-3xl text-4xl font-black leading-tight sm:text-5xl md:text-6xl">
+          Connect with your people easily.
+        </h2>
+
+        <p className="mt-5 max-w-xl text-base leading-7 text-white/90 sm:text-lg">
+          Send messages, create groups, make calls, share files and locations in
+          one simple app.
+        </p>
+
+        <div className="mt-8 flex w-full max-w-sm flex-col gap-3 sm:flex-row sm:max-w-none sm:justify-center">
           <Link
-            href="/login"
-            className="rounded-xl bg-emerald-500 px-6 py-3 font-bold text-black"
+            href="/auth/register"
+            className="rounded-xl bg-white px-7 py-4 font-black text-orange-600 no-underline shadow-xl"
           >
-            Login
+            Create Account
           </Link>
 
           <Link
-            href="/register"
-            className="rounded-xl border border-zinc-700 px-6 py-3 font-bold"
+            href="/auth/login"
+            className="rounded-xl border border-white/70 px-7 py-4 font-black text-white no-underline"
           >
-            Create Account
+            Login
           </Link>
         </div>
       </section>

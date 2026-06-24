@@ -96,7 +96,7 @@ export default function NetworkModal({
       <div className="w-full sm:max-w-[720px] h-[92vh] sm:h-auto sm:max-h-[90vh] overflow-hidden rounded-t-[28px] sm:rounded-[28px] bg-white shadow-2xl border border-gray-100 d-flex flex-column">
         <header className="d-flex align-items-center justify-content-between px-3 px-sm-5 py-3 py-sm-4 border-bottom bg-white">
           <div className="d-flex align-items-center gap-3 min-w-0">
-            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-orange-50 text-orange-500 d-flex align-items-center justify-content-center flex-shrink-0">
+            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded bg-orange-50 text-orange-500 d-flex align-items-center justify-content-center flex-shrink-0">
               <FaUserFriends size={20} />
             </div>
 
