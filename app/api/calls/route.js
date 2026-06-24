@@ -49,6 +49,16 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
     const mode = searchParams.get("mode");
+    const callId = searchParams.get("callId");
+
+    if (callId) {
+  const call = await Call.findById(callId)
+    .populate("caller", "name avatar")
+    .populate("receiver", "name avatar")
+    .populate("conversation");
+
+  return NextResponse.json({ success: true, call });
+}
 
     if (!userId) {
       return NextResponse.json({ error: "userId required" }, { status: 400 });

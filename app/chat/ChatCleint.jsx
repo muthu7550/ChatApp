@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
+import IncomingCallWatcher from "../components/IncomingCallWatcher";
+import IncomingMessageWatcher from "../components/IncomingMessageWatcher";
+import PushNotificationRegister from "../components/PushNotificationRegister";
+import { requestNotificationPermission } from "../lib/notifyClient";
 
 export default function ChatClient() {
   const searchParams = useSearchParams();
@@ -21,7 +25,7 @@ export default function ChatClient() {
     }
 
     setAppHeight();
-
+requestNotificationPermission();
     window.visualViewport?.addEventListener("resize", setAppHeight);
     window.visualViewport?.addEventListener("scroll", setAppHeight);
     window.addEventListener("resize", setAppHeight);
@@ -149,6 +153,17 @@ export default function ChatClient() {
           }
         }
       `}</style>
+
+      {currentUser?._id && (
+  <>
+    <IncomingCallWatcher currentUser={currentUser} />
+    <IncomingMessageWatcher
+      currentUser={currentUser}
+      onRefresh={() => setRefreshKey((prev) => prev + 1)}
+    />
+    <PushNotificationRegister currentUser={currentUser} />
+  </>
+)}
 
       <div className="chat-sidebar-panel">
         <Sidebar

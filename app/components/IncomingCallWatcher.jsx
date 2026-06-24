@@ -12,8 +12,8 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
   const router = useRouter();
 
   const [incomingCall, setIncomingCall] = useState(null);
-  const handledCallRef = useRef(new Set());
   const activeCallRef = useRef(null);
+  const handledCallRef = useRef(new Set());
 
   useEffect(() => {
     activeCallRef.current = incomingCall;
@@ -28,36 +28,31 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
     };
   }
 
-  function normalizeConversationId(call) {
+  function getConversationId(call) {
     return call?.conversation?._id || call?.conversation;
   }
 
-  function normalizeCallType(call) {
+  function getCallType(call) {
     return call?.callType || call?.type || "audio";
   }
 
-  function openIncomingCall(call) {
+  function showCall(call) {
     if (!call?._id) return;
     if (handledCallRef.current.has(call._id)) return;
 
-    handledCallRef.current.add(call._id);
     setIncomingCall(call);
-
     playNotifySound("call");
 
     showBrowserNotification({
-      title: `Incoming ${normalizeCallType(call)} call`,
+      title: `Incoming ${getCallType(call)} call`,
       body: `${call?.caller?.name || "Someone"} is calling you`,
       icon: call?.caller?.avatar || "/default-avatar.png",
-      onClick: () => {
-        setIncomingCall(call);
-        router.push("/chat");
-      },
+      url: `/chat?incomingCallId=${call._id}`,
     });
   }
 
   useEffect(() => {
-    async function loadCallFromUrl() {
+    async function loadCallById() {
       if (!incomingCallId || !currentUser?._id) return;
 
       try {
@@ -69,14 +64,14 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
         const call = result?.call;
 
         if (call?._id && call?.status === "ringing") {
-          openIncomingCall(call);
+          showCall(call);
         }
       } catch (error) {
         console.error("Load incoming call error:", error);
       }
     }
 
-    loadCallFromUrl();
+    loadCallById();
   }, [incomingCallId, currentUser?._id]);
 
   useEffect(() => {
@@ -97,7 +92,7 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
         const call = result?.call;
 
         if (call?._id && call?.status === "ringing") {
-          openIncomingCall(call);
+          showCall(call);
         }
       } catch (error) {
         console.error("Call polling error:", error);
@@ -121,18 +116,13 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
 
         if (!latestCall?._id) return;
 
-        if (
-          latestCall.status === "cancelled" ||
-          latestCall.status === "ended" ||
-          latestCall.status === "rejected" ||
-          latestCall.status === "missed"
-        ) {
+        if (["cancelled", "ended", "rejected", "missed"].includes(latestCall.status)) {
           stopNotifySound();
-          setIncomingCall(null);
           handledCallRef.current.add(latestCall._id);
+          setIncomingCall(null);
         }
       } catch (error) {
-        console.error("Incoming call status watch error:", error);
+        console.error("Incoming call watch error:", error);
       }
     }, 1500);
 
@@ -142,45 +132,39 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
   useEffect(() => {
     if (!incomingCall?._id) return;
 
-    const missedTimer = setTimeout(async () => {
-      if (!activeCallRef.current?._id) return;
-
-      await updateCall("missed", false);
+    const timer = setTimeout(() => {
+      if (activeCallRef.current?._id) {
+        updateCall("missed", false);
+      }
     }, 30000);
 
-    return () => clearTimeout(missedTimer);
+    return () => clearTimeout(timer);
   }, [incomingCall?._id]);
 
-  async function updateCall(status, navigateAfterAccept = true) {
+  async function updateCall(status, navigate = true) {
     if (!incomingCall?._id) return;
 
-    const callToHandle = incomingCall;
+    const call = incomingCall;
 
     stopNotifySound();
-    handledCallRef.current.add(callToHandle._id);
+    handledCallRef.current.add(call._id);
     setIncomingCall(null);
 
-    try {
-      await fetch("/api/calls", {
-        method: "PUT",
-        headers: getAuthHeaders({
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({
-          callId: callToHandle._id,
-          status,
-        }),
-      });
+    await fetch("/api/calls", {
+      method: "PUT",
+      headers: getAuthHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({
+        callId: call._id,
+        status,
+      }),
+    });
 
-      if (status === "accepted" && navigateAfterAccept) {
-        router.push(
-          `/call?room=${normalizeConversationId(callToHandle)}&type=${normalizeCallType(
-            callToHandle
-          )}&callId=${callToHandle._id}`
-        );
-      }
-    } catch (error) {
-      console.error("Update call error:", error);
+    if (status === "accepted" && navigate) {
+      router.push(
+        `/call?room=${getConversationId(call)}&type=${getCallType(call)}&callId=${call._id}`
+      );
     }
   }
 
@@ -192,11 +176,9 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
         .incoming-call-layer {
           position: fixed;
           inset: 0;
-          z-index: 99999;
-          background:
-            radial-gradient(circle at top, rgba(255,157,46,.25), transparent 35%),
-            rgba(0,0,0,.78);
-          backdrop-filter: blur(10px);
+          z-index: 999999;
+          background: rgba(0,0,0,.78);
+          backdrop-filter: blur(12px);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -206,27 +188,23 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
         .incoming-call-card {
           width: min(370px, 100%);
           border-radius: 32px;
-          padding: 28px;
+          padding: 30px;
           text-align: center;
-          color: #111827;
-          background: #ffffff;
-          box-shadow: 0 30px 100px rgba(0,0,0,.42);
-          border: 1px solid rgba(255,255,255,.45);
-          animation: callCardIn .22s ease both;
+          background: white;
+          box-shadow: 0 30px 100px rgba(0,0,0,.4);
         }
 
-        .caller-avatar-wrap {
+        .caller-ring {
           width: 112px;
           height: 112px;
           margin: 0 auto;
-          border-radius: 999px;
           padding: 5px;
+          border-radius: 999px;
           background: linear-gradient(135deg,#ff9d2e,#ff5b2f);
-          box-shadow: 0 0 0 0 rgba(255,91,47,.45);
-          animation: callerPulse 1.25s infinite;
+          animation: pulseCall 1.2s infinite;
         }
 
-        .caller-avatar-wrap img {
+        .caller-ring img {
           width: 100%;
           height: 100%;
           border-radius: 999px;
@@ -234,28 +212,25 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
           border: 4px solid white;
         }
 
-        .call-type-pill {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
+        .call-pill {
           margin-top: 18px;
-          padding: 8px 15px;
+          display: inline-block;
+          padding: 8px 16px;
           border-radius: 999px;
           background: #fff3eb;
           color: #ff5b2f;
-          font-size: 13px;
           font-weight: 900;
+          font-size: 13px;
         }
 
         .call-actions {
           display: flex;
-          align-items: center;
           justify-content: center;
           gap: 28px;
           margin-top: 26px;
         }
 
-        .call-action-btn {
+        .call-action {
           width: 68px;
           height: 68px;
           border: 0;
@@ -263,55 +238,25 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
           color: white;
           font-size: 28px;
           font-weight: 900;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: .18s ease;
         }
 
-        .call-action-btn:hover {
-          transform: scale(1.06);
-        }
-
-        .reject-btn {
+        .reject {
           background: #ef4444;
-          box-shadow: 0 16px 32px rgba(239,68,68,.35);
         }
 
-        .accept-btn {
+        .accept {
           background: #22c55e;
-          box-shadow: 0 16px 32px rgba(34,197,94,.35);
         }
 
-        @keyframes callCardIn {
-          from {
-            opacity: 0;
-            transform: translateY(18px) scale(.96);
-          }
-
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        @keyframes callerPulse {
-          0% {
-            box-shadow: 0 0 0 0 rgba(255,91,47,.45);
-          }
-
-          70% {
-            box-shadow: 0 0 0 22px rgba(255,91,47,0);
-          }
-
-          100% {
-            box-shadow: 0 0 0 0 rgba(255,91,47,0);
-          }
+        @keyframes pulseCall {
+          0% { box-shadow: 0 0 0 0 rgba(255,91,47,.45); }
+          70% { box-shadow: 0 0 0 22px rgba(255,91,47,0); }
+          100% { box-shadow: 0 0 0 0 rgba(255,91,47,0); }
         }
       `}</style>
 
       <div className="incoming-call-card">
-        <div className="caller-avatar-wrap">
+        <div className="caller-ring">
           <img
             src={
               incomingCall?.caller?.avatar ||
@@ -323,34 +268,20 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
           />
         </div>
 
-        <div className="call-type-pill">
-          Incoming {normalizeCallType(incomingCall)} call
-        </div>
+        <div className="call-pill">Incoming {getCallType(incomingCall)} call</div>
 
         <h2 className="fw-bold mt-3 mb-1">
           {incomingCall?.caller?.name || "Someone"}
         </h2>
 
-        <p className="text-secondary mb-0">
-          ChatterBox Pro Max is ringing...
-        </p>
+        <p className="text-secondary mb-0">ChatterBox Pro Max is ringing...</p>
 
         <div className="call-actions">
-          <button
-            type="button"
-            onClick={() => updateCall("rejected")}
-            className="call-action-btn reject-btn"
-            title="Reject"
-          >
+          <button onClick={() => updateCall("rejected")} className="call-action reject">
             ✕
           </button>
 
-          <button
-            type="button"
-            onClick={() => updateCall("accepted")}
-            className="call-action-btn accept-btn"
-            title="Accept"
-          >
+          <button onClick={() => updateCall("accepted")} className="call-action accept">
             ✓
           </button>
         </div>
