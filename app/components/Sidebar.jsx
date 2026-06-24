@@ -15,6 +15,7 @@ import {
   FaEye,
   FaTrashAlt,
   FaEllipsisV,
+  FaChevronDown,
 } from "react-icons/fa";
 import { ChatAvatar } from "./Avatar";
 
@@ -34,22 +35,27 @@ export default function Sidebar({
   const [usersLoading, setUsersLoading] = useState(true);
 
   const [showGroup, setShowGroup] = useState(false);
-  const [search, setSearch] = useState("");
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNetwork, setShowNetwork] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [openChatMenuId, setOpenChatMenuId] = useState(null);
+
+  const [groupsOpen, setGroupsOpen] = useState(true);
+  const [chatsOpen, setChatsOpen] = useState(true);
 
   const profileMenuRef = useRef(null);
   const chatMenuRef = useRef(null);
 
-  const privateChats = conversations?.filter((c) => c?.type === "direct");
-  const groupChats = conversations?.filter((c) => c?.type === "group");
-
   const orangeGradient = "linear-gradient(135deg, #ff9d2e, #ff5b2f)";
+
+  const privateChats = conversations.filter((c) => c?.type === "direct");
+  const groupChats = conversations.filter((c) => c?.type === "group");
 
   function getAuthHeaders(extraHeaders = {}) {
     const token = localStorage.getItem("token");
+
     return {
       Authorization: token ? `Bearer ${token}` : "",
       ...extraHeaders,
@@ -61,7 +67,7 @@ export default function Sidebar({
       localStorage.clear();
       localStorage.setItem(
         "sessionMessage",
-        "Your session has expired. Please login again.",
+        "Your session has expired. Please login again."
       );
       router.push("/auth/login");
       return true;
@@ -136,7 +142,7 @@ export default function Sidebar({
         `/api/users?userId=${currentUser?._id}&search=${searchText}`,
         {
           headers: getAuthHeaders(),
-        },
+        }
       );
 
       if (await handleUnauthorized(res)) return;
@@ -148,6 +154,65 @@ export default function Sidebar({
       setUsers([]);
     } finally {
       if (showLoader) setUsersLoading(false);
+    }
+  }
+
+  async function startDirectChat(receiverId) {
+    const token = localStorage.getItem("token");
+
+    try {
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({
+          type: "direct",
+          currentUserId: currentUser?._id,
+          receiverId,
+        }),
+      });
+
+      if (await handleUnauthorized(res)) return;
+
+      const result = await res.json();
+
+      if (!res.ok || !result?.success) {
+        alert(result?.error || "Chat create failed");
+        return;
+      }
+
+      setShowNetwork(false);
+
+      setConversations((prev) => {
+        const exists = prev.some(
+          (item) => item?._id === result?.conversation?._id
+        );
+
+        if (exists) {
+          return prev.map((item) =>
+            item?._id === result?.conversation?._id
+              ? result?.conversation
+              : item
+          );
+        }
+
+        return [result?.conversation, ...prev];
+      });
+
+      onSelectConversation(result?.conversation);
+      setMobileChatOpen?.(true);
+      router.push(`/chat?conversationId=${result?.conversation?._id}`);
+
+      onRefresh?.();
+
+      setTimeout(() => {
+        fetchConversations(false);
+      }, 300);
+    } catch (error) {
+      console.error("Start direct chat error:", error);
+      alert("Something went wrong");
     }
   }
 
@@ -192,72 +257,8 @@ export default function Sidebar({
       const callResult = await callRes.json();
 
       if (callResult?.success) {
-        window.location.href =
-          `/call?room=${conversationId}` +
-          `&type=${type}` +
-          `&callId=${callResult?.call?._id}`;
+        window.location.href = `/call?room=${conversationId}&type=${type}&callId=${callResult?.call?._id}`;
       }
-    }
-  }
-
-  async function startDirectChat(receiverId) {
-    const token = localStorage.getItem("token");
-
-    try {
-      const res = await fetch("/api/conversations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-        body: JSON.stringify({
-          type: "direct",
-          currentUserId: currentUser?._id,
-          receiverId,
-        }),
-      });
-
-      if (await handleUnauthorized(res)) return;
-
-      const result = await res.json();
-
-      if (!res.ok || !result?.success) {
-        alert(result?.error || "Chat create failed");
-        return;
-      }
-
-      setShowNetwork(false);
-
-      setConversations((prev) => {
-        const exists = prev.some(
-          (item) => item?._id === result?.conversation?._id,
-        );
-
-        if (exists) {
-          return prev.map((item) =>
-            item?._id === result?.conversation?._id
-              ? result?.conversation
-              : item,
-          );
-        }
-
-        return [result?.conversation, ...prev];
-      });
-
-      onSelectConversation(result?.conversation);
-      setMobileChatOpen?.(true);
-      onRefresh?.();
-
-      router.push(`/chat?conversationId=${result?.conversation?._id}`);
-
-// inside startDirectChat timeout
-setTimeout(() => {
-  fetchConversations(false);
-}, 300);
-
-    } catch (error) {
-      console.error("Start direct chat error:", error);
-      alert("Something went wrong");
     }
   }
 
@@ -270,21 +271,40 @@ setTimeout(() => {
       {
         method: "DELETE",
         headers: getAuthHeaders(),
-      },
+      }
     );
 
     if (await handleUnauthorized(res)) return;
 
     const result = await res.json();
 
-// inside deleteConversation success
-if (result?.success) {
-  onRefresh?.();
-  onSelectConversation(null);
-  setMobileChatOpen?.(false);
-  router.push("/chat");
-  fetchConversations(false);
-}
+    if (result?.success) {
+      onRefresh?.();
+      onSelectConversation(null);
+      setMobileChatOpen?.(false);
+      router.push("/chat");
+      fetchConversations(false);
+    }
+  }
+
+  async function handleConversationClick(conversation) {
+    const res = await fetch("/api/messages/read", {
+      method: "POST",
+      headers: getAuthHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({
+        conversationId: conversation?._id,
+        userId: currentUser?._id,
+      }),
+    });
+
+    if (await handleUnauthorized(res)) return;
+
+    onSelectConversation(conversation);
+    setMobileChatOpen?.(true);
+    router.push(`/chat?conversationId=${conversation?._id}`);
+    fetchConversations(false);
   }
 
   function handleEditProfile() {
@@ -300,7 +320,7 @@ if (result?.success) {
 
   async function handleDeleteAccount() {
     const confirmDelete = window.confirm(
-      "Are you sure? This will permanently delete your account, chats, messages and groups.",
+      "Are you sure? This will permanently delete your account, chats, messages and groups."
     );
 
     if (!confirmDelete) return;
@@ -337,86 +357,27 @@ if (result?.success) {
     return (
       user?.avatar ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        user?.name || "User",
+        user?.name || "User"
       )}&background=ff6b2c&color=ffffff&bold=true`
     );
-  }
-
-  function getGroupFallbackAvatar(name) {
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(
-      name || "Group",
-    )}&background=ff6b2c&color=ffffff&bold=true`;
-  }
-
-  function isUiAvatar(url) {
-    return typeof url === "string" && url.includes("ui-avatars.com/api");
   }
 
   function getConversationName(conversation) {
     if (conversation?.type === "group") return conversation?.name || "Group";
 
     const receiver = conversation?.members?.find(
-      (member) => member?._id !== currentUser?._id,
+      (member) => member?._id !== currentUser?._id
     );
 
     return receiver?.name || "Unknown User";
   }
-
-  function getGroupFallbackAvatar(name) {
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(
-      name || "Group",
-    )}&background=ff6b2c&color=ffffff&bold=true`;
-  }
-
-  function isGeneratedAvatar(url) {
-    return typeof url === "string" && url.includes("ui-avatars.com");
-  }
-
-  function getConversationAvatar(conversation) {
-    if (conversation?.type === "group") {
-      if (!conversation?.avatar || isGeneratedAvatar(conversation?.avatar)) {
-        return getGroupFallbackAvatar(conversation?.name);
-      }
-
-      return conversation.avatar;
-    }
-
-    const receiver = conversation?.members?.find(
-      (member) => member?._id !== currentUser?._id,
-    );
-
-    return getUserAvatar(receiver);
-  }
-
-// handleConversationClick
-async function handleConversationClick(conversation) {
-  const res = await fetch("/api/messages/read", {
-    method: "POST",
-    headers: getAuthHeaders({
-      "Content-Type": "application/json",
-    }),
-    body: JSON.stringify({
-      conversationId: conversation?._id,
-      userId: currentUser?._id,
-    }),
-  });
-
-  if (await handleUnauthorized(res)) return;
-
-  onSelectConversation(conversation);
-  setMobileChatOpen?.(true);
-  router.push(`/chat?conversationId=${conversation?._id}`);
-
-  fetchConversations(false);
-}
 
   function renderConversationItem(conversation) {
     const active = selectedConversation?._id === conversation?._id;
     const isMenuOpen = openChatMenuId === conversation?._id;
 
     const lastSenderId =
-      conversation?.lastMessage?.sender?._id ||
-      conversation?.lastMessage?.sender;
+      conversation?.lastMessage?.sender?._id || conversation?.lastMessage?.sender;
 
     const lastMessageText =
       lastSenderId === currentUser?._id
@@ -426,14 +387,14 @@ async function handleConversationClick(conversation) {
     return (
       <div
         key={conversation?._id}
-        className={`d-flex align-items-center px-3 py-2 sidebar-chat-item position-relative ${
+        className={`sidebar-chat-item d-flex align-items-center px-3 py-2 position-relative ${
           active ? "active" : ""
         }`}
       >
         <button
           type="button"
           onClick={() => handleConversationClick(conversation)}
-          className="btn p-0 flex-grow-1 d-flex align-items-center text-start border-0 text-dark overflow-hidden"
+          className="btn p-0 flex-grow-1 d-flex align-items-center text-start border-0 overflow-hidden"
         >
           <ChatAvatar
             conversation={conversation}
@@ -446,10 +407,7 @@ async function handleConversationClick(conversation) {
               {getConversationName(conversation)}
             </div>
 
-            <div
-              className="text-secondary text-truncate"
-              style={{ fontSize: 13 }}
-            >
+            <div className="text-secondary text-truncate" style={{ fontSize: 13 }}>
               {lastMessageText}
             </div>
           </div>
@@ -471,21 +429,17 @@ async function handleConversationClick(conversation) {
           )}
         </button>
 
-        <div
-          ref={isMenuOpen ? chatMenuRef : null}
-          className="position-relative"
-        >
+        <div ref={isMenuOpen ? chatMenuRef : null} className="position-relative">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setOpenChatMenuId((prev) =>
-                prev === conversation?._id ? null : conversation?._id,
+                prev === conversation?._id ? null : conversation?._id
               );
             }}
             className="btn btn-sm ms-2 rounded-circle d-flex align-items-center justify-content-center border-0 text-secondary"
             style={{ width: 34, height: 34 }}
-            title="More"
           >
             <FaEllipsisV size={12} />
           </button>
@@ -493,10 +447,7 @@ async function handleConversationClick(conversation) {
           {isMenuOpen && (
             <div
               className="position-absolute end-0 top-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden"
-              style={{
-                width: 190,
-                zIndex: 9999,
-              }}
+              style={{ width: 190, zIndex: 9999 }}
             >
               <button
                 type="button"
@@ -517,8 +468,31 @@ async function handleConversationClick(conversation) {
   }
 
   return (
-    <aside className="sidebar-shell d-flex flex-column h-100 w-100 position-relative">
+    <aside className="sidebar-shell d-flex flex-column h-100 w-100 position-relative bg-white">
       <style>{`
+        .sidebar-shell {
+          color: #111827;
+        }
+
+        .sidebar-top-btn {
+          width: 42px;
+          height: 42px;
+          border-radius: 999px;
+          border: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, #ff9d2e, #ff5b2f);
+          color: white;
+          box-shadow: 0 10px 22px rgba(255, 91, 47, 0.25);
+          transition: .18s ease;
+        }
+
+        .sidebar-top-btn:hover {
+          transform: translateY(-1px);
+          filter: brightness(.98);
+        }
+
         .sidebar-profile-menu {
           position: absolute;
           left: 0;
@@ -532,30 +506,15 @@ async function handleConversationClick(conversation) {
           box-shadow: 0 18px 50px rgba(15, 23, 42, 0.16);
         }
 
-        .sidebar-profile-menu::before {
-          content: "";
-          position: absolute;
-          top: -7px;
-          left: 18px;
-          width: 14px;
-          height: 14px;
-          background: #ffffff;
-          border-left: 1px solid #f1f1f1;
-          border-top: 1px solid #f1f1f1;
-          transform: rotate(45deg);
-        }
-
         .sidebar-profile-menu-item {
           width: 100%;
           border: 0;
           background: #ffffff;
           padding: 13px 16px;
           font-size: 14px;
-          font-weight: 600;
+          font-weight: 700;
           color: #334155;
           transition: 0.18s ease;
-          position: relative;
-          z-index: 1;
         }
 
         .sidebar-profile-menu-item:hover {
@@ -563,23 +522,153 @@ async function handleConversationClick(conversation) {
           color: #ff5b2f;
         }
 
-        .orange-gradient-btn {
-          background: linear-gradient(135deg, #ff9d2e, #ff5b2f) !important;
-          color: #ffffff !important;
-          border: 0 !important;
-          box-shadow: 0 10px 24px rgba(255, 91, 47, 0.28);
+        .sidebar-search {
+          background: #f8fafc;
+          border-color: #eef2f7 !important;
         }
 
-        .orange-gradient-btn:hover {
-          filter: brightness(0.98);
-          transform: translateY(-1px);
+        .sidebar-search .input-group-text,
+        .sidebar-search .form-control {
+          background: transparent;
+          border: 0;
+          box-shadow: none;
+        }
+
+        .sidebar-accordion-card {
+          border: 1px solid #f1f1f1;
+          border-radius: 18px;
+          overflow: hidden;
+          background: #ffffff;
+          margin: 0 12px 12px;
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+        }
+
+        .sidebar-accordion-head {
+          width: 100%;
+          border: 0;
+          color: #ffffff;
+          background: linear-gradient(135deg, #ff9d2e, #ff5b2f);
+          padding: 12px 14px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-weight: 900;
+        }
+
+        .sidebar-accordion-title {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          min-width: 0;
+        }
+
+        .sidebar-accordion-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .accordion-action-btn {
+          width: 30px;
+          height: 30px;
+          border-radius: 999px;
+          border: 0;
+          background: rgba(255,255,255,.22);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .accordion-chevron {
+          transition: .2s ease;
+        }
+
+        .accordion-chevron.open {
+          transform: rotate(180deg);
+        }
+
+        .sidebar-chat-item {
+          transition: .18s ease;
+          border-bottom: 1px solid #f8fafc;
+        }
+
+        .sidebar-chat-item:hover {
+          background: #fff7f1;
+        }
+
+        .sidebar-chat-item.active {
+          background: #fff1e7;
+        }
+
+        .empty-box {
+          margin: 12px;
+          padding: 18px;
+          border-radius: 18px;
+          background: #fff7f1;
+          border: 1px dashed #ffbd9c;
+          text-align: center;
+        }
+
+        .empty-action-btn {
+          border: 0;
+          border-radius: 999px;
+          padding: 10px 16px;
+          font-size: 13px;
+          font-weight: 900;
+          background: linear-gradient(135deg, #ff9d2e, #ff5b2f);
+          color: #fff;
+        }
+
+        .sidebar-skeleton-row {
+          padding: 10px 12px;
+        }
+
+        .sidebar-skeleton-avatar,
+        .sidebar-skeleton-line,
+        .sidebar-skeleton-dot {
+          background: linear-gradient(90deg,#fff3eb 25%,#ffd9c7 50%,#fff3eb 75%);
+          background-size: 200% 100%;
+          animation: sidebarShimmer 1.15s infinite;
+        }
+
+        .sidebar-skeleton-avatar {
+          width: 44px;
+          height: 44px;
+          border-radius: 999px;
+          flex-shrink: 0;
+        }
+
+        .sidebar-skeleton-line {
+          height: 11px;
+          border-radius: 999px;
+          margin-bottom: 9px;
+        }
+
+        .sidebar-skeleton-line-title {
+          width: 70%;
+        }
+
+        .sidebar-skeleton-line-text {
+          width: 45%;
+        }
+
+        .sidebar-skeleton-dot {
+          width: 22px;
+          height: 22px;
+          border-radius: 999px;
+        }
+
+        @keyframes sidebarShimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
         }
       `}</style>
 
-      <header className="sidebar-header d-flex align-items-center justify-content-between px-3 py-3">
+      <header className="sidebar-header d-flex align-items-center justify-content-between px-3 py-3 border-bottom">
         <div
           ref={profileMenuRef}
-          className="d-flex align-items-center gap-3 position-relative"
+          className="d-flex align-items-center gap-3 position-relative overflow-visible"
         >
           <button
             type="button"
@@ -589,7 +678,7 @@ async function handleConversationClick(conversation) {
           >
             <img
               src={getUserAvatar(currentUser)}
-              className="rounded-circle object-fit-cover profile-avatar"
+              className="rounded-circle object-fit-cover"
               width="44"
               height="44"
               alt="profile"
@@ -602,9 +691,7 @@ async function handleConversationClick(conversation) {
                 type="button"
                 onClick={() => {
                   setShowProfileMenu(false);
-                  setPreviewImage(
-                    currentUser?.avatar || getUserAvatar(currentUser),
-                  );
+                  setPreviewImage(currentUser?.avatar || getUserAvatar(currentUser));
                 }}
                 className="sidebar-profile-menu-item d-flex align-items-center gap-2"
               >
@@ -649,18 +736,30 @@ async function handleConversationClick(conversation) {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowGroup(true)}
-          className="btn rounded-circle d-flex align-items-center justify-content-center sidebar-icon-btn orange-gradient-btn"
-          title="Create Group"
-        >
-          <FaPlus />
-        </button>
+        <div className="d-flex align-items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowNetwork(true)}
+            className="sidebar-top-btn"
+            title="Our Network"
+            disabled={usersLoading}
+          >
+            <FaUserFriends />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowGroup(true)}
+            className="sidebar-top-btn"
+            title="Create Group"
+          >
+            <FaPlus />
+          </button>
+        </div>
       </header>
 
-      <div className="px-3 py-3 sidebar-search-wrap">
-        <div className="input-group sidebar-search border border-1 rounded">
+      <div className="px-3 py-3">
+        <div className="input-group sidebar-search border rounded-4">
           <span className="input-group-text">
             <FaSearch />
           </span>
@@ -677,46 +776,68 @@ async function handleConversationClick(conversation) {
         </div>
       </div>
 
-      <div className="px-3 pb-3">
-        <button
-          type="button"
-          onClick={() => setShowNetwork(true)}
-          className="btn w-100 rounded-4 py-3 fw-bold d-flex align-items-center justify-content-center gap-2 orange-gradient-btn"
-          disabled={usersLoading}
+      <section className="sidebar-scroll flex-grow-1 overflow-auto pb-3">
+        <AccordionSection
+          title="Groups"
+          icon={<FaUsers />}
+          count={groupChats.length}
+          open={groupsOpen}
+          onToggle={() => setGroupsOpen((prev) => !prev)}
+          actionIcon={<FaPlus />}
+          onAction={() => setShowGroup(true)}
         >
-          <FaUserFriends />
-          {usersLoading ? "Loading Network..." : "Our Network"}
-        </button>
-      </div>
+          {conversationsLoading ? (
+            <SidebarSkeleton count={3} />
+          ) : groupChats.length > 0 ? (
+            groupChats.map((conversation) => renderConversationItem(conversation))
+          ) : (
+            <div className="empty-box">
+              <div className="fw-bold text-dark mb-1">No groups yet</div>
+              <div className="small text-secondary mb-3">
+                Create your first group chat.
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGroup(true)}
+                className="empty-action-btn "
+              >
+                <FaPlus className="me-2" />
+                Create Group
+              </button>
+            </div>
+          )}
+        </AccordionSection>
 
-      <section className="sidebar-scroll flex-grow-1 overflow-auto">
-        <div className="sidebar-section-title px-3 pt-2 pb-2 d-flex align-items-center gap-2">
-          <FaUsers />
-          Groups
-        </div>
-
-        {conversationsLoading ? (
-          <SidebarSkeleton count={3} />
-        ) : groupChats?.length > 0 ? (
-          groupChats.map((conversation) => renderConversationItem(conversation))
-        ) : (
-          <p className="px-3 py-2 small text-secondary mb-0">No groups yet</p>
-        )}
-
-        <div className="sidebar-section-title px-3 pt-3 pb-2 d-flex align-items-center gap-2">
-          <FaComments />
-          Chats
-        </div>
-
-        {conversationsLoading ? (
-          <SidebarSkeleton count={5} />
-        ) : privateChats?.length > 0 ? (
-          privateChats.map((conversation) =>
-            renderConversationItem(conversation),
-          )
-        ) : (
-          <p className="px-3 py-2 small text-secondary mb-0">No chats yet</p>
-        )}
+        <AccordionSection
+          title="Chats"
+          icon={<FaComments />}
+          count={privateChats.length}
+          open={chatsOpen}
+          onToggle={() => setChatsOpen((prev) => !prev)}
+          actionIcon={<FaPlus />}
+          onAction={() => setShowNetwork(true)}
+        >
+          {conversationsLoading ? (
+            <SidebarSkeleton count={5} />
+          ) : privateChats.length > 0 ? (
+            privateChats.map((conversation) => renderConversationItem(conversation))
+          ) : (
+            <div className="empty-box">
+              <div className="fw-bold text-dark mb-1">No chats yet</div>
+              <div className="small text-secondary mb-3">
+                Start a new private chat.
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNetwork(true)}
+                className="empty-action-btn"
+              >
+                <FaPlus className="me-2" />
+                New Chat
+              </button>
+            </div>
+          )}
+        </AccordionSection>
       </section>
 
       {showGroup && (
@@ -735,7 +856,7 @@ async function handleConversationClick(conversation) {
             }
 
             onRefresh?.();
-            fetchConversations(true);
+            fetchConversations(false);
           }}
         />
       )}
@@ -784,13 +905,58 @@ async function handleConversationClick(conversation) {
   );
 }
 
+function AccordionSection({
+  title,
+  icon,
+  count,
+  open,
+  onToggle,
+  actionIcon,
+  onAction,
+  children,
+}) {
+  return (
+    <div className="sidebar-accordion-card">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="sidebar-accordion-head"
+      >
+        <span className="sidebar-accordion-title">
+          {icon}
+          <span>{title}</span>
+          <span className="badge bg-white text-dark rounded-pill">{count}</span>
+        </span>
+
+        <span className="sidebar-accordion-actions">
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAction?.();
+            }}
+            className="accordion-action-btn"
+          >
+            {actionIcon}
+          </span>
+
+          <FaChevronDown className={`accordion-chevron ${open ? "open" : ""}`} />
+        </span>
+      </button>
+
+      {open && <div className="accordion-body p-0">{children}</div>}
+    </div>
+  );
+}
+
 function SidebarSkeleton({ count = 4 }) {
   return (
-    <div className="px-3 py-1">
+    <div className="py-2">
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
-          className="d-flex align-items-center gap-3 py-2 sidebar-skeleton-row"
+          className="d-flex align-items-center gap-3 sidebar-skeleton-row"
         >
           <div className="sidebar-skeleton-avatar" />
 
