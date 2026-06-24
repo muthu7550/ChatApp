@@ -19,8 +19,11 @@ export default function ChatWindow({
   onRefreshConversations,
   onBack,
 }) {
-  const router = useRouter();
-  const bottomRef = useRef(null);
+  
+const router = useRouter();
+const bottomRef = useRef(null);
+const chatBodyRef = useRef(null);
+const shouldScrollAfterLoadRef = useRef(false);
 
   const [messages, setMessages] = useState([]);
   const [initialChatLoading, setInitialChatLoading] = useState(false);
