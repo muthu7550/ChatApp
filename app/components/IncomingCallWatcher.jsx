@@ -12,6 +12,8 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
   const router = useRouter();
 
   const [incomingCall, setIncomingCall] = useState(null);
+  const [accepting, setAccepting] = useState(false);
+
   const activeCallRef = useRef(null);
   const handledCallRef = useRef(new Set());
 
@@ -41,6 +43,7 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
     if (handledCallRef.current.has(call._id)) return;
 
     setIncomingCall(call);
+    setAccepting(false);
     playNotifySound("call");
 
     showBrowserNotification({
@@ -77,13 +80,20 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
   useEffect(() => {
     if (!currentUser?._id) return;
 
-    const interval = setInterval(async () => {
+    let cancelled = false;
+    let busy = false;
+
+    async function pollCall() {
+      if (cancelled || busy) return;
+      if (activeCallRef.current?._id) return;
+
       try {
-        if (activeCallRef.current?._id) return;
+        busy = true;
 
         const res = await fetch(
           `/api/calls?userId=${currentUser._id}&mode=ringing`,
           {
+            cache: "no-store",
             headers: getAuthHeaders(),
           }
         );
@@ -91,46 +101,28 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
         const result = await res.json().catch(() => null);
         const call = result?.call;
 
-        if (call?._id && call?.status === "ringing") {
+        if (!cancelled && call?._id && call?.status === "ringing") {
           showCall(call);
         }
       } catch (error) {
-        console.error("Call polling error:", error);
+        console.warn("Call polling skipped:", error?.message);
+      } finally {
+        busy = false;
       }
-    }, 3000);
+    }
 
-    return () => clearInterval(interval);
+    pollCall();
+
+    const interval = setInterval(pollCall, 3000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [currentUser?._id]);
 
   useEffect(() => {
-    if (!incomingCall?._id) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/calls?callId=${incomingCall._id}`, {
-          headers: getAuthHeaders(),
-        });
-
-        const result = await res.json().catch(() => null);
-        const latestCall = result?.call;
-
-        if (!latestCall?._id) return;
-
-        if (["cancelled", "ended", "rejected", "missed"].includes(latestCall.status)) {
-          stopNotifySound();
-          handledCallRef.current.add(latestCall._id);
-          setIncomingCall(null);
-        }
-      } catch (error) {
-        console.error("Incoming call watch error:", error);
-      }
-    }, 1500);
-
-    return () => clearInterval(interval);
-  }, [incomingCall?._id]);
-
-  useEffect(() => {
-    if (!incomingCall?._id) return;
+    if (!incomingCall?._id || accepting) return;
 
     const timer = setTimeout(() => {
       if (activeCallRef.current?._id) {
@@ -139,14 +131,37 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
     }, 30000);
 
     return () => clearTimeout(timer);
-  }, [incomingCall?._id]);
+  }, [incomingCall?._id, accepting]);
 
   async function updateCall(status, navigate = true) {
     if (!incomingCall?._id) return;
 
     const call = incomingCall;
+    const room = getConversationId(call);
+    const type = getCallType(call);
 
     stopNotifySound();
+
+    if (status === "accepted") {
+      setAccepting(true);
+
+      await fetch("/api/calls", {
+        method: "PUT",
+        headers: getAuthHeaders({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          callId: call._id,
+          status: "accepted",
+        }),
+      });
+
+      handledCallRef.current.add(call._id);
+
+      router.replace(`/call?room=${room}&type=${type}&callId=${call._id}`);
+      return;
+    }
+
     handledCallRef.current.add(call._id);
     setIncomingCall(null);
 
@@ -162,9 +177,7 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
     });
 
     if (status === "accepted" && navigate) {
-      router.push(
-        `/call?room=${getConversationId(call)}&type=${getCallType(call)}&callId=${call._id}`
-      );
+      router.replace(`/call?room=${room}&type=${type}&callId=${call._id}`);
     }
   }
 
@@ -177,7 +190,7 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
           position: fixed;
           inset: 0;
           z-index: 999999;
-          background: rgba(0,0,0,.78);
+          background: rgba(0,0,0,.82);
           backdrop-filter: blur(12px);
           display: flex;
           align-items: center;
@@ -248,10 +261,44 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
           background: #22c55e;
         }
 
+        .connecting-text {
+          margin-top: 22px;
+          font-weight: 900;
+          color: #22c55e;
+        }
+
+        .connect-dots {
+          display: flex;
+          justify-content: center;
+          gap: 7px;
+          margin-top: 14px;
+        }
+
+        .connect-dots span {
+          width: 9px;
+          height: 9px;
+          border-radius: 999px;
+          background: #22c55e;
+          animation: dotBounce 1s infinite;
+        }
+
+        .connect-dots span:nth-child(2) {
+          animation-delay: .15s;
+        }
+
+        .connect-dots span:nth-child(3) {
+          animation-delay: .3s;
+        }
+
         @keyframes pulseCall {
           0% { box-shadow: 0 0 0 0 rgba(255,91,47,.45); }
           70% { box-shadow: 0 0 0 22px rgba(255,91,47,0); }
           100% { box-shadow: 0 0 0 0 rgba(255,91,47,0); }
+        }
+
+        @keyframes dotBounce {
+          0%, 80%, 100% { transform: scale(.7); opacity: .45; }
+          40% { transform: scale(1); opacity: 1; }
         }
       `}</style>
 
@@ -268,23 +315,49 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
           />
         </div>
 
-        <div className="call-pill">Incoming {getCallType(incomingCall)} call</div>
+        <div className="call-pill">
+          Incoming {getCallType(incomingCall)} call
+        </div>
 
         <h2 className="fw-bold mt-3 mb-1">
           {incomingCall?.caller?.name || "Someone"}
         </h2>
 
-        <p className="text-secondary mb-0">ChatterBox Pro Max is ringing...</p>
+        {!accepting ? (
+          <>
+            <p className="text-secondary mb-0">
+              ChatterBox Pro Max is ringing...
+            </p>
 
-        <div className="call-actions">
-          <button onClick={() => updateCall("rejected")} className="call-action reject">
-            ✕
-          </button>
+            <div className="call-actions">
+              <button
+                onClick={() => updateCall("rejected")}
+                className="call-action reject"
+                type="button"
+              >
+                ✕
+              </button>
 
-          <button onClick={() => updateCall("accepted")} className="call-action accept">
-            ✓
-          </button>
-        </div>
+              <button
+                onClick={() => updateCall("accepted")}
+                className="call-action accept"
+                type="button"
+              >
+                ✓
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="connecting-text">Connecting to call...</div>
+
+            <div className="connect-dots">
+              <span />
+              <span />
+              <span />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
