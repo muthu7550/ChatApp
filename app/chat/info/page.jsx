@@ -16,6 +16,11 @@ import {
   FaComments,
   FaRegImages,
   FaUserShield,
+  FaGlobe,
+  FaUserPlus,
+  FaDoorOpen,
+  FaEdit,
+  FaCheckCircle,
 } from "react-icons/fa";
 import CreateGroupModal from "../../components/CreateGroupModal";
 
@@ -42,14 +47,79 @@ function ChatInfoContent() {
   const [showGroupModal, setShowGroupModal] = useState(false);
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "null");
-    setCurrentUser(user);
+    setCurrentUser(JSON.parse(localStorage.getItem("user") || "null"));
   }, []);
 
   useEffect(() => {
     if (!conversationId || !currentUser?._id) return;
     loadInfo();
   }, [conversationId, currentUser?._id]);
+
+  const isGroup = conversation?.type === "group";
+
+  const isAdmin =
+    conversation?.admins?.some?.(
+      (admin) =>
+        (admin?._id || admin)?.toString() === currentUser?._id?.toString()
+    ) || false;
+
+  const otherPerson = useMemo(() => {
+    if (!conversation || isGroup) return null;
+    return conversation?.members?.find(
+      (member) => member?._id !== currentUser?._id
+    );
+  }, [conversation, currentUser?._id, isGroup]);
+
+  const title = isGroup
+    ? conversation?.name || "Group"
+    : otherPerson?.name || "User";
+
+  const avatar =
+    conversation?.avatar ||
+    conversation?.image ||
+    otherPerson?.avatar ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      title || "User"
+    )}&background=ff6b2c&color=ffffff&bold=true`;
+
+  const sortedMembers = useMemo(() => {
+    const list = conversation?.members || [];
+    return [...list].sort((a, b) => {
+      if (a?._id === currentUser?._id) return -1;
+      if (b?._id === currentUser?._id) return 1;
+      return (a?.name || "").localeCompare(b?.name || "");
+    });
+  }, [conversation?.members, currentUser?._id]);
+
+  const media = [];
+  const docs = [];
+  const links = [];
+
+  messages.forEach((message) => {
+    message?.attachments?.forEach((file) => {
+      if (file?.type === "image" || file?.type === "video") media.push(file);
+      else docs.push(file);
+    });
+
+    const foundLinks = message?.text?.match?.(/(https?:\/\/[^\s]+)/g) || [];
+    foundLinks.forEach((link) =>
+      links.push({ url: link, text: message?.text })
+    );
+  });
+
+  const isBlockedByMe =
+    !isGroup &&
+    currentUser?.blockedUsers?.some?.(
+      (id) => id?.toString() === otherPerson?._id?.toString()
+    );
+
+  const isBlockedByOther =
+    !isGroup &&
+    otherPerson?.blockedUsers?.some?.(
+      (id) => id?.toString() === currentUser?._id?.toString()
+    );
+
+  const isChatRestricted = !isGroup && (isBlockedByMe || isBlockedByOther);
 
   async function loadInfo() {
     try {
@@ -82,43 +152,42 @@ function ChatInfoContent() {
     }
   }
 
-  const otherPerson = useMemo(() => {
-    if (!conversation || conversation?.type === "group") return null;
-    return conversation?.members?.find(
-      (member) => member?._id !== currentUser?._id
-    );
-  }, [conversation, currentUser?._id]);
+  async function updateGroup(action, extra = {}) {
+    const token = localStorage.getItem("token");
 
-  const title =
-    conversation?.type === "group"
-      ? conversation?.name || "Group"
-      : otherPerson?.name || "User";
-
-  const avatar =
-    conversation?.image ||
-    otherPerson?.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(
-      title || "User"
-    )}&background=ff6b2c&color=ffffff&bold=true`;
-
-  const media = [];
-  const docs = [];
-  const links = [];
-
-  messages.forEach((message) => {
-    message?.attachments?.forEach((file) => {
-      if (file?.type === "image" || file?.type === "video") media.push(file);
-      else docs.push(file);
+    const res = await fetch("/api/groups", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+      body: JSON.stringify({
+        conversationId,
+        userId: currentUser?._id,
+        action,
+        ...extra,
+      }),
     });
 
-    const foundLinks = message?.text?.match?.(/(https?:\/\/[^\s]+)/g) || [];
-    foundLinks.forEach((link) =>
-      links.push({ url: link, text: message?.text })
-    );
-  });
+    const result = await res.json();
+
+    if (!res.ok || !result?.success) {
+      alert(result?.error || "Group update failed");
+      return;
+    }
+
+    if (action === "leave_group") {
+      router.replace("/chat");
+      return;
+    }
+
+    setConversation(result.conversation);
+  }
 
   async function clearChat() {
-    const ok = confirm("Clear this chat for you?");
+    const ok = confirm(
+      isGroup ? "Clear group messages for you?" : "Clear this chat for you?"
+    );
     if (!ok) return;
 
     const token = localStorage.getItem("token");
@@ -131,16 +200,122 @@ function ChatInfoContent() {
       }
     );
 
+    if (isGroup) {
+      setMessages([]);
+      return;
+    }
+
     router.replace("/chat");
+  }
+
+  async function blockUser() {
+    if (!currentUser?._id || !otherPerson?._id) return;
+
+    const ok = confirm(`Block ${title}?`);
+    if (!ok) return;
+
+    const token = localStorage.getItem("token");
+
+    const res = await fetch("/api/users/block", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+      body: JSON.stringify({
+        userId: currentUser._id,
+        targetUserId: otherPerson._id,
+      }),
+    });
+
+    const result = await res.json();
+
+    if (result?.success) {
+      const updatedUser = {
+        ...currentUser,
+        blockedUsers: [...(currentUser?.blockedUsers || []), otherPerson._id],
+      };
+
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      window.location.href = `/chat?conversationId=${conversationId}`;
+    } else {
+      alert(result?.error || "Block failed");
+    }
+  }
+
+  async function unblockUser() {
+    if (!currentUser?._id || !otherPerson?._id) return;
+
+    const ok = confirm(`Unblock ${title}?`);
+    if (!ok) return;
+
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(
+      `/api/users/block?userId=${currentUser._id}&targetUserId=${otherPerson._id}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
+      }
+    );
+
+    const result = await res.json();
+
+    if (!res.ok || !result?.success) {
+      alert(result?.error || "Unblock failed");
+      return;
+    }
+
+    const updatedUser = {
+      ...currentUser,
+      blockedUsers: (currentUser?.blockedUsers || []).filter(
+        (id) => id?.toString() !== otherPerson?._id?.toString()
+      ),
+    };
+
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+    window.location.href = `/chat?conversationId=${conversationId}`;
+  }
+
+  async function startCall(type) {
+    if (isChatRestricted) {
+      alert("Call not allowed for blocked contact");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+
+    const res = await fetch("/api/calls", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+      body: JSON.stringify({
+        conversationId,
+        callerId: currentUser?._id,
+        type,
+      }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok || !result?.success) {
+      alert(result?.error || "Call create failed");
+      return;
+    }
+
+    router.push(
+      `/call?room=${conversationId}&type=${type}&callId=${result?.call?._id}`
+    );
   }
 
   if (loading) return <InfoLoading />;
 
   return (
-    <main className="info-page min-vh-100">
+    <main className="info-page">
       <style>{`
         .info-page {
-          min-height: 100vh;
           height: 100vh;
           overflow-y: auto;
           overflow-x: hidden;
@@ -156,12 +331,24 @@ function ChatInfoContent() {
           top: 0;
           z-index: 100;
           backdrop-filter: blur(18px);
-          background: rgba(255,255,255,.88);
+          background: rgba(255,255,255,.92);
           border-bottom: 1px solid rgba(226,232,240,.9);
         }
 
+        .page-container {
+          max-width: 1180px;
+        }
+
+        .soft-card {
+          background: #ffffff;
+          border: 1px solid #eef2f7;
+          border-radius: 26px;
+          box-shadow: 0 16px 38px rgba(15,23,42,.06);
+          overflow: hidden;
+        }
+
         .hero-card {
-          border-radius: 32px;
+          border-radius: 30px;
           overflow: hidden;
           background: #ffffff;
           box-shadow: 0 24px 70px rgba(15,23,42,.10);
@@ -169,21 +356,21 @@ function ChatInfoContent() {
         }
 
         .hero-cover {
-          height: 150px;
+          height: 145px;
           background:
             radial-gradient(circle at 16% 10%, rgba(255,255,255,.58), transparent 18%),
             radial-gradient(circle at 80% 25%, rgba(255,255,255,.32), transparent 24%),
-            linear-gradient(135deg, #ff9d2e, #ff5b2f);
+            ${ORANGE};
         }
 
         .avatar-wrap {
-          width: 132px;
-          height: 132px;
-          margin-top: -66px;
+          width: 128px;
+          height: 128px;
+          margin-top: -64px;
           padding: 5px;
           border-radius: 999px;
           background: #ffffff;
-          box-shadow: 0 20px 48px rgba(255,91,47,.28);
+          box-shadow: 0 20px 48px rgba(255,91,47,.26);
         }
 
         .info-avatar {
@@ -193,14 +380,21 @@ function ChatInfoContent() {
           object-fit: cover;
         }
 
+        .quick-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+        }
+
         .quick-btn {
           border: 0;
-          border-radius: 22px;
+          border-radius: 20px;
           background: #fff7f1;
           color: #ff5b2f;
-          padding: 14px 12px;
+          padding: 14px 8px;
           font-weight: 900;
           transition: .18s ease;
+          width: 100%;
         }
 
         .quick-btn:hover {
@@ -208,19 +402,64 @@ function ChatInfoContent() {
           box-shadow: 0 16px 34px rgba(255,91,47,.16);
         }
 
-        .soft-card {
-          background: #ffffff;
-          border: 1px solid #eef2f7;
-          border-radius: 26px;
-          box-shadow: 0 16px 38px rgba(15,23,42,.06);
+        .quick-btn:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
         }
 
         .section-title {
-          font-size: 13px;
+          font-size: 12px;
           text-transform: uppercase;
           letter-spacing: .08em;
           color: #94a3b8;
           font-weight: 900;
+        }
+
+        .option-row {
+          width: 100%;
+          border: 0;
+          background: #ffffff;
+          padding: 16px;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          text-align: left;
+          border-bottom: 1px solid #f1f5f9;
+        }
+
+        .option-row:last-child {
+          border-bottom: 0;
+        }
+
+        .option-row:hover {
+          background: #fff7f1;
+        }
+
+        .option-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 16px;
+          display: grid;
+          place-items: center;
+          background: #fff3eb;
+          color: #ff5b2f;
+          flex-shrink: 0;
+        }
+
+        .danger-row {
+          color: #dc2626 !important;
+        }
+
+        .danger-row .option-icon {
+          color: #dc2626;
+          background: #fee2e2;
+        }
+
+        .group-settings-grid {
+          display: grid;
+          grid-template-columns: 1fr;
         }
 
         .tab-pill {
@@ -238,10 +477,6 @@ function ChatInfoContent() {
           color: white;
           background: ${ORANGE};
           box-shadow: 0 12px 26px rgba(255,91,47,.22);
-        }
-
-        .shared-card {
-          overflow: hidden;
         }
 
         .shared-tab-scroll {
@@ -262,7 +497,21 @@ function ChatInfoContent() {
         }
 
         .shared-content-area {
-          min-height: 260px;
+          height: 360px;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding-right: 4px;
+        }
+
+        .shared-content-area::-webkit-scrollbar,
+        .members-list::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .shared-content-area::-webkit-scrollbar-thumb,
+        .members-list::-webkit-scrollbar-thumb {
+          background: #ffd0ba;
+          border-radius: 999px;
         }
 
         .shared-list {
@@ -285,25 +534,6 @@ function ChatInfoContent() {
         .shared-list-item:hover {
           background: #fff7f1;
           transform: translateY(-1px);
-        }
-
-        .members-list {
-          max-height: 430px;
-          overflow-y: auto;
-          padding-right: 4px;
-        }
-
-        .member-row {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          padding: 12px;
-          border-radius: 18px;
-          transition: 0.18s ease;
-        }
-
-        .member-row:hover {
-          background: #fff7f1;
         }
 
         .media-grid {
@@ -341,44 +571,35 @@ function ChatInfoContent() {
           place-items: center;
         }
 
-        .option-row {
-          width: 100%;
-          border: 0;
-          background: #ffffff;
-          padding: 17px 18px;
+        .members-list {
+          max-height: 520px;
+          overflow-y: auto;
+          padding-right: 4px;
+        }
+
+        .member-row {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           gap: 14px;
-          text-align: left;
-          border-bottom: 1px solid #f1f5f9;
+          padding: 14px;
+          border-radius: 20px;
+          transition: 0.18s ease;
+          border: 1px solid transparent;
         }
 
-        .option-row:last-child {
-          border-bottom: 0;
-        }
-
-        .option-row:hover {
+        .member-row:hover {
           background: #fff7f1;
+          border-color: #ffd9c7;
         }
 
-        .option-icon {
-          width: 44px;
-          height: 44px;
-          border-radius: 16px;
-          display: grid;
-          place-items: center;
-          background: #fff3eb;
-          color: #ff5b2f;
-          flex-shrink: 0;
+        .member-row.me {
+          background: linear-gradient(135deg, #fff7f1, #ffffff);
+          border: 1px solid #ffd9c7;
         }
 
-        .danger-row {
-          color: #dc2626 !important;
-        }
-
-        .danger-row .option-icon {
-          color: #dc2626;
-          background: #fee2e2;
+        .member-action-btn {
+          font-size: 12px;
+          font-weight: 800;
         }
 
         .empty-box {
@@ -395,52 +616,53 @@ function ChatInfoContent() {
           .media-grid {
             grid-template-columns: repeat(3, 1fr);
           }
+
+          .shared-content-area {
+            height: 330px;
+          }
         }
 
         @media (max-width: 576px) {
+          .page-container {
+            padding-left: 10px;
+            padding-right: 10px;
+          }
+
+          .hero-card {
+            border-radius: 0 0 28px 28px;
+          }
+
           .hero-cover {
-            height: 120px;
+            height: 118px;
           }
 
           .avatar-wrap {
-            width: 108px;
-            height: 108px;
-            margin-top: -54px;
+            width: 106px;
+            height: 106px;
+            margin-top: -53px;
+          }
+
+          .quick-btn {
+            font-size: 12px;
+            padding: 12px 6px;
           }
 
           .media-grid {
             grid-template-columns: repeat(2, 1fr);
           }
 
-          .hero-card {
-            border-radius: 0 0 30px 30px;
+          .shared-content-area {
+            height: 300px;
           }
 
-          .shared-search-btn {
-            width: 42px;
-            height: 42px;
-            padding: 0 !important;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0;
-          }
-
-          .shared-search-btn .me-2 {
-            margin-right: 0 !important;
-          }
-
-          .shared-search-btn svg {
-            font-size: 14px;
+          .member-row {
+            padding: 12px 8px;
           }
         }
       `}</style>
 
       <header className="top-bar px-3 py-3">
-        <div
-          className="container d-flex align-items-center gap-3"
-          style={{ maxWidth: 1100 }}
-        >
+        <div className="container page-container d-flex align-items-center gap-3">
           <button
             type="button"
             onClick={() => router.back()}
@@ -452,7 +674,7 @@ function ChatInfoContent() {
 
           <div className="min-w-0">
             <h6 className="mb-0 fw-bold text-truncate">
-              {conversation?.type === "group" ? "Group info" : "Contact info"}
+              {isGroup ? "Group info" : "Contact info"}
             </h6>
             <small className="text-secondary text-truncate d-block">
               {title}
@@ -461,10 +683,7 @@ function ChatInfoContent() {
         </div>
       </header>
 
-      <section
-        className="container py-3 py-sm-4 pb-5"
-        style={{ maxWidth: 1100 }}
-      >
+      <section className="container page-container py-3 py-sm-4 pb-5">
         <div className="row g-4">
           <div className="col-12 col-lg-4">
             <div className="hero-card text-center mb-4">
@@ -478,37 +697,42 @@ function ChatInfoContent() {
                 <h3 className="fw-bold mt-3 mb-1 text-truncate">{title}</h3>
 
                 <p className="text-secondary mb-3 text-truncate">
-                  {conversation?.type === "group"
+                  {isGroup
                     ? `${conversation?.members?.length || 0} members`
                     : otherPerson?.email || "Private chat"}
                 </p>
 
-                <div className="row g-2">
-                  <div className="col-4">
-                    <button className="quick-btn w-100">
-                      <FaPhoneAlt className="d-block mx-auto mb-2" />
-                      Audio
-                    </button>
-                  </div>
+                <div className="quick-grid">
+                  <button
+                    type="button"
+                    className="quick-btn"
+                    disabled={isChatRestricted || isGroup}
+                    onClick={() => startCall("audio")}
+                  >
+                    <FaPhoneAlt className="d-block mx-auto mb-2" />
+                    Audio
+                  </button>
 
-                  <div className="col-4">
-                    <button className="quick-btn w-100">
-                      <FaVideo className="d-block mx-auto mb-2" />
-                      Video
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="quick-btn"
+                    disabled={isChatRestricted || isGroup}
+                    onClick={() => startCall("video")}
+                  >
+                    <FaVideo className="d-block mx-auto mb-2" />
+                    Video
+                  </button>
 
-                  <div className="col-4">
-                    <button
-                      className="quick-btn w-100"
-                      onClick={() =>
-                        router.push(`/chat?conversationId=${conversationId}`)
-                      }
-                    >
-                      <FaComments className="d-block mx-auto mb-2" />
-                      Chat
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="quick-btn"
+                    onClick={() =>
+                      router.push(`/chat?conversationId=${conversationId}`)
+                    }
+                  >
+                    <FaComments className="d-block mx-auto mb-2" />
+                    Chat
+                  </button>
                 </div>
               </div>
             </div>
@@ -516,14 +740,157 @@ function ChatInfoContent() {
             <div className="soft-card p-4 mb-4">
               <div className="section-title mb-2">About</div>
               <div className="fw-semibold">
-                {conversation?.type === "group"
+                {isGroup
                   ? conversation?.description || "Group created in ChatterBox."
                   : "Hey there! I am using ChatterBox."}
               </div>
             </div>
 
-            <div className="soft-card overflow-hidden mb-4">
-              {conversation?.type !== "group" && (
+            {isGroup && (
+              <div className="soft-card mb-4">
+                <button
+                  className="option-row"
+                  onClick={() => {
+                    const text = prompt(
+                      "Edit group about",
+                      conversation?.description || ""
+                    );
+                    if (text !== null) {
+                      updateGroup("update_description", { description: text });
+                    }
+                  }}
+                >
+                  <span className="option-icon">
+                    <FaEdit />
+                  </span>
+                  <span>
+                    <span className="d-block fw-bold">Edit group about</span>
+                    <small className="text-secondary">
+                      {conversation?.description || "No group about added"}
+                    </small>
+                  </span>
+                </button>
+
+                {isAdmin && (
+                  <>
+                    <button
+                      className="option-row"
+                      onClick={() =>
+                        updateGroup("update_settings", {
+                          groupPrivacy:
+                            conversation?.groupPrivacy === "public"
+                              ? "private"
+                              : "public",
+                        })
+                      }
+                    >
+                      <span className="option-icon">
+                        <FaGlobe />
+                      </span>
+                      <span className="fw-bold">
+                        Make group{" "}
+                        {conversation?.groupPrivacy === "public"
+                          ? "private"
+                          : "public"}
+                      </span>
+                    </button>
+
+                    <button
+                      className="option-row"
+                      onClick={() =>
+                        updateGroup("update_settings", {
+                          messagePermission:
+                            conversation?.messagePermission === "admins"
+                              ? "all"
+                              : "admins",
+                        })
+                      }
+                    >
+                      <span className="option-icon">
+                        <FaComments />
+                      </span>
+                      <span className="fw-bold">
+                        {conversation?.messagePermission === "admins"
+                          ? "Allow everyone to message"
+                          : "Only admins can message"}
+                      </span>
+                    </button>
+
+                    <button
+                      className="option-row"
+                      onClick={() =>
+                        updateGroup("update_settings", {
+                          memberPermission:
+                            conversation?.memberPermission === "admins"
+                              ? "all"
+                              : "admins",
+                        })
+                      }
+                    >
+                      <span className="option-icon">
+                        <FaUserPlus />
+                      </span>
+                      <span className="fw-bold">
+                        {conversation?.memberPermission === "admins"
+                          ? "Allow members to add people"
+                          : "Only admins can add people"}
+                      </span>
+                    </button>
+
+                    <button
+                      className="option-row"
+                      onClick={() =>
+                        updateGroup("update_settings", {
+                          joinApproval: !conversation?.joinApproval,
+                        })
+                      }
+                    >
+                      <span className="option-icon">
+                        <FaCheckCircle />
+                      </span>
+                      <span className="fw-bold">
+                        {conversation?.joinApproval
+                          ? "Disable join approval"
+                          : "Enable join approval"}
+                      </span>
+                    </button>
+
+                    <button
+                      className="option-row"
+                      onClick={() => updateGroup("generate_invite_link")}
+                    >
+                      <span className="option-icon">
+                        <FaLink />
+                      </span>
+                      <span>
+                        <span className="d-block fw-bold">
+                          Generate invite link
+                        </span>
+                        <small className="text-secondary">
+                          {conversation?.inviteLink || "No invite link"}
+                        </small>
+                      </span>
+                    </button>
+                  </>
+                )}
+
+                <button
+                  className="option-row danger-row"
+                  onClick={() => {
+                    const ok = confirm("Leave this group?");
+                    if (ok) updateGroup("leave_group");
+                  }}
+                >
+                  <span className="option-icon">
+                    <FaDoorOpen />
+                  </span>
+                  <span className="fw-bold">Leave group</span>
+                </button>
+              </div>
+            )}
+
+            <div className="soft-card mb-4">
+              {!isGroup && (
                 <button
                   type="button"
                   className="option-row"
@@ -549,35 +916,44 @@ function ChatInfoContent() {
                 </span>
                 <span>
                   <span className="d-block fw-bold">Encryption</span>
-                  <small className="text-secondary">Messages stay private</small>
+                  <small className="text-secondary">
+                    Messages stay private
+                  </small>
                 </span>
               </button>
             </div>
 
-            <div className="soft-card overflow-hidden">
-              {conversation?.type !== "group" && (
-                <button
-                  className="option-row danger-row"
-                  onClick={() => alert("Block API not added yet")}
-                >
-                  <span className="option-icon">
-                    <FaBan />
-                  </span>
-                  <span className="fw-bold">Block {title}</span>
-                </button>
-              )}
+            <div className="soft-card">
+              {!isGroup &&
+                (isBlockedByMe ? (
+                  <button className="option-row danger-row" onClick={unblockUser}>
+                    <span className="option-icon">
+                      <FaBan />
+                    </span>
+                    <span className="fw-bold">Unblock {title}</span>
+                  </button>
+                ) : (
+                  <button className="option-row danger-row" onClick={blockUser}>
+                    <span className="option-icon">
+                      <FaBan />
+                    </span>
+                    <span className="fw-bold">Block {title}</span>
+                  </button>
+                ))}
 
               <button className="option-row danger-row" onClick={clearChat}>
                 <span className="option-icon">
                   <FaTrashAlt />
                 </span>
-                <span className="fw-bold">Clear chat</span>
+                <span className="fw-bold">
+                  {isGroup ? "Clear group messages" : "Clear chat"}
+                </span>
               </button>
             </div>
           </div>
 
           <div className="col-12 col-lg-8">
-            <div className="soft-card shared-card p-3 p-sm-4 mb-4">
+            <div className="soft-card p-3 p-sm-4 mb-4">
               <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
                 <div className="min-w-0">
                   <div className="section-title">Shared content</div>
@@ -587,7 +963,7 @@ function ChatInfoContent() {
                 </div>
 
                 <button
-                  className="btn shared-search-btn rounded-pill px-3 fw-bold border-0 flex-shrink-0"
+                  className="btn rounded-pill px-3 fw-bold border-0 flex-shrink-0"
                   style={{ background: "#fff3eb", color: "#ff5b2f" }}
                 >
                   <FaSearch className="me-2 d-inline-block" />
@@ -597,38 +973,29 @@ function ChatInfoContent() {
 
               <div className="shared-tab-scroll mb-4">
                 <div className="shared-tab-row">
-                  <button
-                    type="button"
+                  <TabButton
+                    active={activeTab === "media"}
                     onClick={() => setActiveTab("media")}
-                    className={`tab-pill ${
-                      activeTab === "media" ? "active" : ""
-                    }`}
-                  >
-                    <FaRegImages className="me-2 d-inline-block" />
-                    Media <span>{media.length}</span>
-                  </button>
+                    icon={<FaRegImages />}
+                    label="Media"
+                    count={media.length}
+                  />
 
-                  <button
-                    type="button"
+                  <TabButton
+                    active={activeTab === "docs"}
                     onClick={() => setActiveTab("docs")}
-                    className={`tab-pill ${
-                      activeTab === "docs" ? "active" : ""
-                    }`}
-                  >
-                    <FaFileAlt className="me-2 d-inline-block" />
-                    Docs <span>{docs.length}</span>
-                  </button>
+                    icon={<FaFileAlt />}
+                    label="Docs"
+                    count={docs.length}
+                  />
 
-                  <button
-                    type="button"
+                  <TabButton
+                    active={activeTab === "links"}
                     onClick={() => setActiveTab("links")}
-                    className={`tab-pill ${
-                      activeTab === "links" ? "active" : ""
-                    }`}
-                  >
-                    <FaLink className="me-2 d-inline-block" />
-                    Links <span>{links.length}</span>
-                  </button>
+                    icon={<FaLink />}
+                    label="Links"
+                    count={links.length}
+                  />
                 </div>
               </div>
 
@@ -717,43 +1084,119 @@ function ChatInfoContent() {
               </div>
             </div>
 
-            {conversation?.type === "group" && (
-              <div className="soft-card members-card p-3 p-sm-4">
-                <div className="d-flex align-items-center justify-content-between mb-3">
+            {isGroup && (
+              <div className="soft-card p-3 p-sm-4">
+                <div className="d-flex align-items-center justify-content-between gap-3 mb-3">
                   <div>
                     <div className="section-title">Members</div>
                     <h5 className="fw-bold mb-0">
                       {conversation?.members?.length || 0} participants
                     </h5>
                   </div>
+
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      className="btn rounded-pill px-3 fw-bold border-0"
+                      style={{ background: "#fff3eb", color: "#ff5b2f" }}
+                    >
+                      <FaUserPlus className="me-2" />
+                      Add
+                    </button>
+                  )}
                 </div>
 
                 <div className="members-list">
-                  {(conversation?.members || []).map((member) => (
-                    <div key={member?._id} className="member-row">
-                      <img
-                        src={
-                          member?.avatar ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                            member?.name || "User"
-                          )}&background=ff6b2c&color=ffffff&bold=true`
-                        }
-                        className="rounded-circle object-fit-cover flex-shrink-0"
-                        width="48"
-                        height="48"
-                        alt={member?.name}
-                      />
+                  {sortedMembers.map((member) => {
+                    const memberId = member?._id?.toString();
+                    const isMe = memberId === currentUser?._id?.toString();
 
-                      <div className="min-w-0 flex-grow-1">
-                        <div className="fw-bold text-truncate">
-                          {member?.name || "User"}
+                    const isMemberAdmin =
+                      conversation?.admins?.some(
+                        (admin) =>
+                          (admin?._id || admin)?.toString() === memberId
+                      ) || false;
+
+                    return (
+                      <div
+                        key={member?._id}
+                        className={`member-row ${isMe ? "me" : ""}`}
+                      >
+                        <img
+                          src={
+                            member?.avatar ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                              member?.name || "User"
+                            )}&background=ff6b2c&color=ffffff&bold=true`
+                          }
+                          className="rounded-circle object-fit-cover flex-shrink-0"
+                          width="50"
+                          height="50"
+                          alt={member?.name}
+                        />
+
+                        <div className="flex-grow-1 min-w-0">
+                          <div className="d-flex align-items-center gap-2 flex-wrap">
+                            <div className="fw-bold text-truncate">
+                              {member?.name || "User"} {isMe ? "(You)" : ""}
+                            </div>
+
+                            {isMemberAdmin && (
+                              <span className="badge bg-warning text-dark rounded-pill">
+                                Admin
+                              </span>
+                            )}
+                          </div>
+
+                          <small className="text-secondary d-block text-truncate">
+                            {member?.email || "Member"}
+                          </small>
+
+                          {isAdmin && !isMe && (
+                            <div className="d-flex gap-2 flex-wrap mt-2">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger rounded-pill member-action-btn"
+                                onClick={() =>
+                                  updateGroup("remove_member", {
+                                    targetUserId: member._id,
+                                  })
+                                }
+                              >
+                                Remove
+                              </button>
+
+                              {isMemberAdmin ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-secondary rounded-pill member-action-btn"
+                                  onClick={() =>
+                                    updateGroup("demote_admin", {
+                                      targetUserId: member._id,
+                                    })
+                                  }
+                                >
+                                  Remove Admin
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-success rounded-pill member-action-btn"
+                                  onClick={() =>
+                                    updateGroup("promote_admin", {
+                                      targetUserId: member._id,
+                                    })
+                                  }
+                                >
+                                  Make Admin
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <small className="text-secondary text-truncate d-block">
-                          {member?.email || "Member"}
-                        </small>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -778,6 +1221,19 @@ function ChatInfoContent() {
         />
       )}
     </main>
+  );
+}
+
+function TabButton({ active, onClick, icon, label, count }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`tab-pill ${active ? "active" : ""}`}
+    >
+      <span className="me-2 d-inline-flex">{icon}</span>
+      {label} <span>{count}</span>
+    </button>
   );
 }
 

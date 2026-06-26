@@ -20,11 +20,7 @@ import {
 } from "react-icons/fa";
 
 import { ChatAvatar } from "./Avatar";
-import {
-  FaPhoneAlt,
-  FaVideo,
-  FaPhoneVolume,
-} from "react-icons/fa";
+import { FaPhoneAlt, FaVideo, FaPhoneVolume } from "react-icons/fa";
 
 export default function Sidebar({
   currentUser,
@@ -62,14 +58,14 @@ export default function Sidebar({
   const privateChats = conversations.filter((c) => c?.type === "direct");
   const groupChats = conversations.filter((c) => c?.type === "group");
   const privateUnreadCount = privateChats.reduce(
-  (total, chat) => total + Number(chat?.unreadCount || 0),
-  0,
-);
+    (total, chat) => total + Number(chat?.unreadCount || 0),
+    0,
+  );
 
-const groupUnreadCount = groupChats.reduce(
-  (total, group) => total + Number(group?.unreadCount || 0),
-  0,
-);
+  const groupUnreadCount = groupChats.reduce(
+    (total, group) => total + Number(group?.unreadCount || 0),
+    0,
+  );
 
   const searchValue = search.trim().toLowerCase();
   const isSearching = searchValue.length > 0;
@@ -348,7 +344,11 @@ const groupUnreadCount = groupChats.reduce(
   }
 
   async function deleteConversation(conversationId) {
-    const ok = confirm("Remove this chat?");
+    const isGroup =
+      conversations.find((item) => item?._id === conversationId)?.type ===
+      "group";
+
+    const ok = confirm(isGroup ? "Leave this group?" : "Delete this chat?");
     if (!ok) return;
 
     const res = await fetch(
@@ -363,31 +363,31 @@ const groupUnreadCount = groupChats.reduce(
 
     const result = await res.json();
 
- if (result?.success) {
-  // Remove conversation immediately from sidebar
-  setConversations((prev) =>
-    prev.filter((item) => item?._id !== conversationId)
-  );
+    if (result?.success) {
+      // Remove conversation immediately from sidebar
+      setConversations((prev) =>
+        prev.filter((item) => item?._id !== conversationId),
+      );
 
-  // Remove related calls immediately from Calls tab
-  setCalls((prev) =>
-    prev.filter((call) => {
-      const callConversationId =
-        call?.conversation?._id || call?.conversation;
+      // Remove related calls immediately from Calls tab
+      setCalls((prev) =>
+        prev.filter((call) => {
+          const callConversationId =
+            call?.conversation?._id || call?.conversation;
 
-      return callConversationId !== conversationId;
-    })
-  );
+          return callConversationId !== conversationId;
+        }),
+      );
 
-  onRefresh?.();
-  onSelectConversation(null);
-  setMobileChatOpen?.(false);
-  router.push("/chat");
+      onRefresh?.();
+      onSelectConversation(null);
+      setMobileChatOpen?.(false);
+      router.push("/chat");
 
-  // Refresh from server
-  fetchConversations(false);
-  fetchCalls();
-}
+      // Refresh from server
+      fetchConversations(false);
+      fetchCalls();
+    }
   }
 
   async function clearConversationsByType(type) {
@@ -532,36 +532,36 @@ const groupUnreadCount = groupChats.reduce(
   }
 
   async function openCallConversation(call) {
-  const conversationId = call?.conversation?._id || call?.conversation;
+    const conversationId = call?.conversation?._id || call?.conversation;
 
-  if (!conversationId) {
-    alert("Conversation not found");
-    return;
+    if (!conversationId) {
+      alert("Conversation not found");
+      return;
+    }
+
+    const res = await fetch("/api/conversations/restore", {
+      method: "POST",
+      headers: getAuthHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({
+        conversationId,
+        userId: currentUser?._id,
+      }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok || !result?.success) {
+      alert(result?.error || "Chat not available");
+      return;
+    }
+
+    onSelectConversation(result.conversation);
+    setMobileChatOpen?.(true);
+    router.push(`/chat?conversationId=${conversationId}`);
+    fetchConversations(false);
   }
-
-  const res = await fetch("/api/conversations/restore", {
-    method: "POST",
-    headers: getAuthHeaders({
-      "Content-Type": "application/json",
-    }),
-    body: JSON.stringify({
-      conversationId,
-      userId: currentUser?._id,
-    }),
-  });
-
-  const result = await res.json();
-
-  if (!res.ok || !result?.success) {
-    alert(result?.error || "Chat not available");
-    return;
-  }
-
-  onSelectConversation(result.conversation);
-  setMobileChatOpen?.(true);
-  router.push(`/chat?conversationId=${conversationId}`);
-  fetchConversations(false);
-}
 
   function getUserAvatar(user) {
     return (
@@ -661,11 +661,11 @@ const groupUnreadCount = groupChats.reduce(
             <FaEllipsisV size={12} />
           </button>
 
-         {isMenuOpen && (
-  <div
-    className="chat-action-menu bg-white border rounded-4 shadow-lg overflow-hidden"
-    style={{ width: 190 }}
-  >
+          {isMenuOpen && (
+            <div
+              className="chat-action-menu bg-white border rounded-4 shadow-lg overflow-hidden"
+              style={{ width: 190 }}
+            >
               <button
                 type="button"
                 onClick={() => {
@@ -674,8 +674,19 @@ const groupUnreadCount = groupChats.reduce(
                 }}
                 className="btn w-100 text-start border-0 rounded-0 px-3 py-3 text-danger d-flex align-items-center gap-2"
               >
-                <FaTrashAlt size={14} />
-                <span className="small fw-semibold">Delete chat</span>
+                {conversation?.type === "group" ? (
+                  <>
+                    <FaSignOutAlt size={14} />
+                    <span className="small fw-semibold">Leave group</span>
+                  </>
+                ) : (
+                  <>
+                    <FaTrashAlt size={14} />
+                   <span className="small fw-semibold">
+  {conversation?.type === "group" ? "Leave group" : "Delete chat"}
+</span>
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -1156,28 +1167,32 @@ const groupUnreadCount = groupChats.reduce(
           <div className="chat-filter-row px-3 pb-3">
             {[
               { key: "all", label: "All" },
-            {
-  key: "chats",
-  label: (
-    <>
-      Chats
-      {privateUnreadCount > 0 && (
-        <span className="tab-missed-badge">{privateUnreadCount}</span>
-      )}
-    </>
-  ),
-},
-{
-  key: "groups",
-  label: (
-    <>
-      Groups
-      {groupUnreadCount > 0 && (
-        <span className="tab-missed-badge">{groupUnreadCount}</span>
-      )}
-    </>
-  ),
-},
+              {
+                key: "chats",
+                label: (
+                  <>
+                    Chats
+                    {privateUnreadCount > 0 && (
+                      <span className="tab-missed-badge">
+                        {privateUnreadCount}
+                      </span>
+                    )}
+                  </>
+                ),
+              },
+              {
+                key: "groups",
+                label: (
+                  <>
+                    Groups
+                    {groupUnreadCount > 0 && (
+                      <span className="tab-missed-badge">
+                        {groupUnreadCount}
+                      </span>
+                    )}
+                  </>
+                ),
+              },
               {
                 key: "calls",
                 label: (
@@ -1244,7 +1259,7 @@ const groupUnreadCount = groupChats.reduce(
                     <button
                       type="button"
                       className="network-result-item"
-                    onClick={() => openCallConversation(call)}
+                      onClick={() => openCallConversation(call)}
                     >
                       <span
                         className="rounded-circle d-flex align-items-center justify-content-center text-white"
@@ -1294,11 +1309,11 @@ const groupUnreadCount = groupChats.reduce(
                       <FaEllipsisV size={12} />
                     </button>
 
-                 {isCallMenuOpen && (
-  <div
-    className="chat-action-menu bg-white border rounded-4 shadow-lg overflow-hidden"
-    style={{ width: 170 }}
-  >
+                    {isCallMenuOpen && (
+                      <div
+                        className="chat-action-menu bg-white border rounded-4 shadow-lg overflow-hidden"
+                        style={{ width: 170 }}
+                      >
                         <button
                           type="button"
                           onClick={() => {
@@ -1372,10 +1387,10 @@ const groupUnreadCount = groupChats.reduce(
                 count={groupChats.length}
                 open={groupsOpen}
                 onToggle={() => setGroupsOpen((prev) => !prev)}
-               actionIcon={<FaPlus />}
-onAction={() => setShowGroup(true)}
-clearIcon={groupChats.length > 0 ? <FaTrashAlt /> : null}
-onClear={() => clearConversationsByType("group")}
+                actionIcon={<FaPlus />}
+                onAction={() => setShowGroup(true)}
+               clearIcon={null}
+onClear={null}
               >
                 {conversationsLoading ? (
                   <SidebarSkeleton count={3} />
@@ -1410,9 +1425,9 @@ onClear={() => clearConversationsByType("group")}
                 open={chatsOpen}
                 onToggle={() => setChatsOpen((prev) => !prev)}
                 actionIcon={<FaPlus />}
-onAction={() => setShowNetwork(true)}
-clearIcon={privateChats.length > 0 ? <FaTrashAlt /> : null}
-onClear={() => clearConversationsByType("direct")}
+                onAction={() => setShowNetwork(true)}
+                clearIcon={privateChats.length > 0 ? <FaTrashAlt /> : null}
+                onClear={() => clearConversationsByType("direct")}
               >
                 {conversationsLoading ? (
                   <SidebarSkeleton count={5} />
@@ -1534,35 +1549,35 @@ function AccordionSection({
         </span>
 
         <span className="sidebar-accordion-actions">
-      {clearIcon && (
-  <span
-    role="button"
-    tabIndex={0}
-    title={`Clear ${title}`}
-    onClick={(e) => {
-      e.stopPropagation();
-      onClear?.();
-    }}
-    className="accordion-action-btn"
-  >
-    {clearIcon}
-  </span>
-)}
+          {clearIcon && (
+            <span
+              role="button"
+              tabIndex={0}
+              title={`Clear ${title}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClear?.();
+              }}
+              className="accordion-action-btn"
+            >
+              {clearIcon}
+            </span>
+          )}
 
-{actionIcon && (
-  <span
-    role="button"
-    tabIndex={0}
-    title={`Add ${title}`}
-    onClick={(e) => {
-      e.stopPropagation();
-      onAction?.();
-    }}
-    className="accordion-action-btn"
-  >
-    {actionIcon}
-  </span>
-)}
+          {actionIcon && (
+            <span
+              role="button"
+              tabIndex={0}
+              title={`Add ${title}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAction?.();
+              }}
+              className="accordion-action-btn"
+            >
+              {actionIcon}
+            </span>
+          )}
 
           <FaChevronDown
             className={`accordion-chevron ${open ? "open" : ""}`}

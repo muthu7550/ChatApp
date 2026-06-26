@@ -3,6 +3,7 @@ import { dbConnect } from "../../lib/db";
 import Conversation from "../../models/Conversation";
 import Message from "../../models/Message";
 import Call from "../../models/Call";
+import mongoose from "mongoose";
 
 export async function GET(req) {
   try {
@@ -18,51 +19,36 @@ export async function GET(req) {
       );
     }
 
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid userId" },
+        { status: 400 }
+      );
+    }
+
     const conversations = await Conversation.find({
       members: userId,
       hiddenFor: { $ne: userId },
     })
-      .populate("members", "name email avatar about isOnline lastSeen")
+      .sort({ updatedAt: -1 })
+      .populate("members", "name email avatar about blockedUsers")
       .populate({
         path: "lastMessage",
         populate: {
           path: "sender",
           select: "name avatar",
         },
-      })
-      .populate("admins", "name email avatar")
-      .sort({ updatedAt: -1 })
-      .lean();
-
-    const conversationsWithCount = await Promise.all(
-      conversations.map(async (conversation) => {
-        const messagesCount = await Message.countDocuments({
-          conversation: conversation?._id,
-        });
-
-        const unreadCount = await Message.countDocuments({
-          conversation: conversation?._id,
-          sender: { $ne: userId },
-          deletedForEveryone: { $ne: true },
-          deletedFor: { $ne: userId },
-          seenBy: { $ne: userId },
-        });
-
-        return {
-          ...conversation,
-          messagesCount,
-          unreadCount,
-        };
-      })
-    );
+      });
 
     return NextResponse.json({
       success: true,
-      conversations: conversationsWithCount,
+      conversations,
     });
   } catch (error) {
+    console.error("GET conversations error:", error);
+
     return NextResponse.json(
-      { success: false, error: error?.message },
+      { success: false, error: error.message },
       { status: 500 }
     );
   }
@@ -183,6 +169,8 @@ export async function DELETE(req) {
       );
     }
 
+    if (conversation.type === "group") {
+
     await Conversation.updateOne(
       { _id: conversationId },
       {
@@ -217,6 +205,9 @@ export async function DELETE(req) {
       success: true,
       message: "Chat deleted for you only",
     });
+  }
+
+
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error?.message },

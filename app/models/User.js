@@ -2,22 +2,61 @@ import mongoose from "mongoose";
 
 const UserSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true },
-    password: { type: String, required: true },
-    avatar: String,
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+
+    password: {
+      type: String,
+      required: true,
+    },
+
+    avatar: {
+      type: String,
+      default: "",
+    },
 
     about: {
       type: String,
       default: "Hey there! I am using ChatterBox Pro Max",
     },
 
-    isOnline: { type: Boolean, default: false },
-    lastSeen: Date,
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
 
-    fcmTokens: [{ type: String }],
+    lastSeen: {
+      type: Date,
+      default: null,
+    },
+
+    fcmTokens: [
+      {
+        type: String,
+      },
+    ],
+
+    blockedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 export default mongoose.models.User || mongoose.model("User", UserSchema);

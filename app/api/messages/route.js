@@ -71,6 +71,7 @@ export async function POST(req) {
     const conversationId = body?.conversationId;
     const senderId = body?.senderId;
 
+
     if (!conversationId || !senderId) {
       return NextResponse.json(
         { success: false, error: "conversationId and senderId required" },
@@ -78,10 +79,33 @@ export async function POST(req) {
       );
     }
 
-    const conversation = await Conversation.findOne({
-      _id: conversationId,
-      members: senderId,
-    });
+const conversation = await Conversation.findOne({
+  _id: conversationId,
+  members: senderId,
+});
+
+if (!conversation) {
+  return NextResponse.json(
+    { success: false, error: "Conversation not found" },
+    { status: 404 }
+  );
+}
+
+if (conversation.type === "group") {
+  const isAdmin =
+    conversation.admins?.some(
+      (id) => id.toString() === senderId
+    ) || false;
+
+  if (conversation.messagePermission === "admins" && !isAdmin) {
+    return NextResponse.json(
+      { success: false, error: "Only admins can send messages" },
+      { status: 403 }
+    );
+  }
+}
+
+
 
     if (!conversation) {
       return NextResponse.json(
