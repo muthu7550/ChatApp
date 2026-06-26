@@ -137,45 +137,52 @@ fetchChatCalls();
     return () => clearInterval(interval);
   }, [activeConversation?._id, currentUser?._id]);
 
-  async function fetchMessages(initialLoad = false) {
-    if (fetchingMessagesRef.current) return;
-    if (!activeConversation?._id || !currentUser?._id) return;
+ async function fetchMessages(initialLoad = false) {
+  if (fetchingMessagesRef.current) return;
+  if (!activeConversation?._id || !currentUser?._id) return;
 
-    const conversationId = activeConversation._id;
+  const conversationId = activeConversation._id;
 
-    try {
-      fetchingMessagesRef.current = true;
+  try {
+    fetchingMessagesRef.current = true;
 
-      const res = await fetch(
-        `/api/messages?conversationId=${conversationId}&userId=${currentUser._id}`,
-        { headers: authHeaders }
-      );
+    const res = await fetch(
+      `/api/messages?conversationId=${conversationId}&userId=${currentUser._id}`,
+      { headers: authHeaders }
+    );
 
-      const result = await res.json();
-      const nextMessages = result?.messages || [];
+    const result = await res.json().catch(() => null);
 
-      if (loadedConversationRef.current !== conversationId) return;
+    // IMPORTANT: do not clear old messages if API failed
+    if (!res.ok || !result?.success) {
+      console.error("Fetch messages failed:", result?.error);
+      return;
+    }
 
-      if (initialLoad) {
-        pendingMessagesRef.current = nextMessages;
-      } else {
-        setMessages(nextMessages);
-        requestAnimationFrame(() => scrollToBottomHard());
-      }
-    } catch (error) {
-      console.error("Fetch messages error:", error);
-    } finally {
-      fetchingMessagesRef.current = false;
+    const nextMessages = result?.messages || [];
 
-      if (initialLoad && loadedConversationRef.current === conversationId) {
-        setTimeout(() => {
-          setMessages(pendingMessagesRef.current);
-          setInitialChatLoading(false);
-          setIsPreparingReveal(true);
-        }, 180);
-      }
+    if (loadedConversationRef.current !== conversationId) return;
+
+    if (initialLoad) {
+      pendingMessagesRef.current = nextMessages;
+    } else {
+      setMessages(nextMessages);
+      requestAnimationFrame(() => scrollToBottomHard());
+    }
+  } catch (error) {
+    console.error("Fetch messages error:", error);
+  } finally {
+    fetchingMessagesRef.current = false;
+
+    if (initialLoad && loadedConversationRef.current === conversationId) {
+      setTimeout(() => {
+        setMessages(pendingMessagesRef.current);
+        setInitialChatLoading(false);
+        setIsPreparingReveal(true);
+      }, 180);
     }
   }
+}
 
   async function fetchChatCalls() {
   if (!activeConversation?._id || !currentUser?._id) return;
@@ -309,6 +316,9 @@ fetchChatCalls();
       }
 
       setMessages((prev) => [...prev, result.message]);
+      setTimeout(() => {
+  fetchMessages(false);
+}, 500);
       setShowRealChat(true);
       onRefreshConversations?.();
 

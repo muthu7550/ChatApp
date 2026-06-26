@@ -13,40 +13,48 @@ export async function GET(req) {
     const conversationId = searchParams.get("conversationId");
     const userId = searchParams.get("userId");
 
-const conversation = await Conversation.findById(conversationId).select(
-  "clearedFor"
-);
+    if (!conversationId || !userId) {
+      return NextResponse.json(
+        { success: false, error: "conversationId and userId required" },
+        { status: 400 }
+      );
+    }
 
-const clearedData = conversation?.clearedFor?.find(
-  (item) => item?.user?.toString() === userId
-);
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      members: userId,
+    }).select("clearedFor");
 
-const messageQuery = {
-  conversation: conversationId,
-};
+    if (!conversation) {
+      return NextResponse.json({
+        success: true,
+        messages: [],
+      });
+    }
 
-if (clearedData?.clearedAt) {
-  messageQuery.createdAt = { $gt: clearedData.clearedAt };
-}
+    const clearedData = conversation?.clearedFor?.find(
+      (item) => item?.user?.toString() === userId
+    );
 
-await Conversation.updateOne(
-  { _id: conversationId },
-  {
-    $pull: {
-      hiddenFor: senderId,
-    },
-  }
-);
+    const messageQuery = {
+      conversation: conversationId,
+    };
 
-const messages = await Message.find(messageQuery)
-  .populate("sender", "name avatar")
-  .sort({ createdAt: 1 });  
+    if (clearedData?.clearedAt) {
+      messageQuery.createdAt = { $gt: clearedData.clearedAt };
+    }
+
+    const messages = await Message.find(messageQuery)
+      .populate("sender", "name avatar")
+      .sort({ createdAt: 1 });
 
     return NextResponse.json({
       success: true,
       messages,
     });
   } catch (error) {
+    console.error("GET messages error:", error);
+
     return NextResponse.json(
       { success: false, error: error?.message },
       { status: 500 }
@@ -60,46 +68,73 @@ export async function POST(req) {
 
     const body = await req.json();
 
+    const conversationId = body?.conversationId;
+    const senderId = body?.senderId;
+
+    if (!conversationId || !senderId) {
+      return NextResponse.json(
+        { success: false, error: "conversationId and senderId required" },
+        { status: 400 }
+      );
+    }
+
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      members: senderId,
+    });
+
+    if (!conversation) {
+      return NextResponse.json(
+        { success: false, error: "Conversation not found" },
+        { status: 404 }
+      );
+    }
+
     const message = await Message.create({
-      conversation: body?.conversationId,
-      sender: body?.senderId,
+      conversation: conversationId,
+      sender: senderId,
       text: body?.text || "",
       attachments: body?.attachments || [],
       location: body?.location || null,
-        seenBy: [body?.senderId],
+      seenBy: [senderId],
     });
 
-    await Conversation.findByIdAndUpdate(body?.conversationId, {
-      lastMessage: message?._id,
-      updatedAt: new Date(),
-    });
+await Conversation.findByIdAndUpdate(conversationId, {
+  lastMessage: message?._id,
+  updatedAt: new Date(),
 
+  // restore sender side chat list + allow new messages to show
+  $pull: {
+    hiddenFor: senderId,
+    clearedFor: { user: senderId },
+  },
+});
     const populatedMessage = await Message.findById(message?._id).populate(
       "sender",
       "name avatar"
     );
 
-    const conversation = await Conversation.findById(body?.conversationId);
+    const receiverIds = conversation?.members
+      ?.map((id) => id.toString())
+      ?.filter((id) => id !== senderId);
 
-const receiverIds = conversation?.members
-  ?.map((id) => id.toString())
-  ?.filter((id) => id !== body?.senderId);
+    const sender = await User.findById(senderId).select("name avatar");
 
-const sender = await User.findById(body?.senderId).select("name avatar");
-
-await sendPushToUsers({
-  userIds: receiverIds,
-  title: sender?.name || "New message",
-  body: body?.text || "Sent an attachment",
-  icon: sender?.avatar || "/default-avatar.png",
-  url: `/chat?conversationId=${body?.conversationId}`,
-});
+    await sendPushToUsers({
+      userIds: receiverIds,
+      title: sender?.name || "New message",
+      body: body?.text || "Sent an attachment",
+      icon: sender?.avatar || "/default-avatar.png",
+      url: `/chat?conversationId=${conversationId}`,
+    });
 
     return NextResponse.json({
       success: true,
       message: populatedMessage,
     });
   } catch (error) {
+    console.error("POST messages error:", error);
+
     return NextResponse.json(
       { success: false, error: error?.message },
       { status: 500 }
@@ -114,12 +149,21 @@ export async function DELETE(req) {
     const { searchParams } = new URL(req.url);
     const conversationId = searchParams.get("conversationId");
 
+    if (!conversationId) {
+      return NextResponse.json(
+        { success: false, error: "conversationId required" },
+        { status: 400 }
+      );
+    }
+
     await Message.deleteMany({
       conversation: conversationId,
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error("DELETE messages error:", error);
+
     return NextResponse.json(
       { success: false, error: error?.message },
       { status: 500 }
