@@ -83,9 +83,10 @@ export async function GET(req) {
       return NextResponse.json({ success: true, call });
     }
 
-    const callQuery = {
-      members: userId,
-    };
+const callQuery = {
+  members: userId,
+  hiddenFor: { $ne: userId },
+};
 
     if (conversationId) {
       callQuery.conversation = conversationId;
@@ -98,11 +99,12 @@ export async function GET(req) {
       .populate("receiver", "name avatar")
       .populate("conversation");
 
-    const missedCount = await Call.countDocuments({
-      members: userId,
-      caller: { $ne: userId },
-      status: "missed",
-    });
+ const missedCount = await Call.countDocuments({
+  members: userId,
+  caller: { $ne: userId },
+  status: "missed",
+  hiddenFor: { $ne: userId },
+});
 
     return NextResponse.json({
       success: true,

@@ -13,10 +13,32 @@ export async function GET(req) {
     const conversationId = searchParams.get("conversationId");
     const userId = searchParams.get("userId");
 
-const messages = await Message.find({
+const conversation = await Conversation.findById(conversationId).select(
+  "clearedFor"
+);
+
+const clearedData = conversation?.clearedFor?.find(
+  (item) => item?.user?.toString() === userId
+);
+
+const messageQuery = {
   conversation: conversationId,
-  deletedFor: { $ne: userId },
-})
+};
+
+if (clearedData?.clearedAt) {
+  messageQuery.createdAt = { $gt: clearedData.clearedAt };
+}
+
+await Conversation.updateOne(
+  { _id: conversationId },
+  {
+    $pull: {
+      hiddenFor: senderId,
+    },
+  }
+);
+
+const messages = await Message.find(messageQuery)
   .populate("sender", "name avatar")
   .sort({ createdAt: 1 });  
 

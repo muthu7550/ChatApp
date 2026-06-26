@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbConnect } from "../../lib/db";
 import Conversation from "../../models/Conversation";
 import Message from "../../models/Message";
+import Call from "../../models/Call";
 
 export async function GET(req) {
   try {
@@ -19,6 +20,7 @@ export async function GET(req) {
 
     const conversations = await Conversation.find({
       members: userId,
+      hiddenFor: { $ne: userId },
     })
       .populate("members", "name email avatar about isOnline lastSeen")
       .populate({
@@ -169,7 +171,10 @@ export async function DELETE(req) {
       );
     }
 
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      members: userId,
+    });
 
     if (!conversation) {
       return NextResponse.json(
@@ -178,24 +183,39 @@ export async function DELETE(req) {
       );
     }
 
-    if (conversation.type === "group") {
-      conversation.members = conversation.members.filter(
-        (id) => id.toString() !== userId
-      );
+    await Conversation.updateOne(
+      { _id: conversationId },
+      {
+        $addToSet: { hiddenFor: userId },
+        $pull: { clearedFor: { user: userId } },
+      }
+    );
 
-      await conversation.save();
+    await Conversation.updateOne(
+      { _id: conversationId },
+      {
+        $push: {
+          clearedFor: {
+            user: userId,
+            clearedAt: new Date(),
+          },
+        },
+      }
+    );
 
-      return NextResponse.json({
-        success: true,
-        message: "Group removed from your chat list",
-      });
-    }
-
-    await Conversation.findByIdAndDelete(conversationId);
+    await Call.updateMany(
+  {
+    conversation: conversationId,
+    members: userId,
+  },
+  {
+    $addToSet: { hiddenFor: userId },
+  }
+);
 
     return NextResponse.json({
       success: true,
-      message: "Chat deleted",
+      message: "Chat deleted for you only",
     });
   } catch (error) {
     return NextResponse.json(

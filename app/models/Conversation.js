@@ -8,6 +8,25 @@ const ConversationSchema = new mongoose.Schema(
     members: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     admins: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     lastMessage: { type: mongoose.Schema.Types.ObjectId, ref: "Message" },
+    hiddenFor: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+],
+
+clearedFor: [
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    clearedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+],
   },
   { timestamps: true }
 );

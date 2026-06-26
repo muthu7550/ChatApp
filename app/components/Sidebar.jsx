@@ -61,6 +61,15 @@ export default function Sidebar({
 
   const privateChats = conversations.filter((c) => c?.type === "direct");
   const groupChats = conversations.filter((c) => c?.type === "group");
+  const privateUnreadCount = privateChats.reduce(
+  (total, chat) => total + Number(chat?.unreadCount || 0),
+  0,
+);
+
+const groupUnreadCount = groupChats.reduce(
+  (total, group) => total + Number(group?.unreadCount || 0),
+  0,
+);
 
   const searchValue = search.trim().toLowerCase();
   const isSearching = searchValue.length > 0;
@@ -354,13 +363,31 @@ export default function Sidebar({
 
     const result = await res.json();
 
-    if (result?.success) {
-      onRefresh?.();
-      onSelectConversation(null);
-      setMobileChatOpen?.(false);
-      router.push("/chat");
-      fetchConversations(false);
-    }
+ if (result?.success) {
+  // Remove conversation immediately from sidebar
+  setConversations((prev) =>
+    prev.filter((item) => item?._id !== conversationId)
+  );
+
+  // Remove related calls immediately from Calls tab
+  setCalls((prev) =>
+    prev.filter((call) => {
+      const callConversationId =
+        call?.conversation?._id || call?.conversation;
+
+      return callConversationId !== conversationId;
+    })
+  );
+
+  onRefresh?.();
+  onSelectConversation(null);
+  setMobileChatOpen?.(false);
+  router.push("/chat");
+
+  // Refresh from server
+  fetchConversations(false);
+  fetchCalls();
+}
   }
 
   async function clearConversationsByType(type) {
@@ -503,6 +530,38 @@ export default function Sidebar({
       alert("Delete failed");
     }
   }
+
+  async function openCallConversation(call) {
+  const conversationId = call?.conversation?._id || call?.conversation;
+
+  if (!conversationId) {
+    alert("Conversation not found");
+    return;
+  }
+
+  const res = await fetch("/api/conversations/restore", {
+    method: "POST",
+    headers: getAuthHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({
+      conversationId,
+      userId: currentUser?._id,
+    }),
+  });
+
+  const result = await res.json();
+
+  if (!res.ok || !result?.success) {
+    alert(result?.error || "Chat not available");
+    return;
+  }
+
+  onSelectConversation(result.conversation);
+  setMobileChatOpen?.(true);
+  router.push(`/chat?conversationId=${conversationId}`);
+  fetchConversations(false);
+}
 
   function getUserAvatar(user) {
     return (
@@ -1097,8 +1156,28 @@ export default function Sidebar({
           <div className="chat-filter-row px-3 pb-3">
             {[
               { key: "all", label: "All" },
-              { key: "chats", label: "Chats" },
-              { key: "groups", label: "Groups" },
+            {
+  key: "chats",
+  label: (
+    <>
+      Chats
+      {privateUnreadCount > 0 && (
+        <span className="tab-missed-badge">{privateUnreadCount}</span>
+      )}
+    </>
+  ),
+},
+{
+  key: "groups",
+  label: (
+    <>
+      Groups
+      {groupUnreadCount > 0 && (
+        <span className="tab-missed-badge">{groupUnreadCount}</span>
+      )}
+    </>
+  ),
+},
               {
                 key: "calls",
                 label: (
@@ -1165,13 +1244,7 @@ export default function Sidebar({
                     <button
                       type="button"
                       className="network-result-item"
-                      onClick={() => {
-                        router.push(
-                          `/chat?conversationId=${
-                            call?.conversation?._id || call?.conversation
-                          }`,
-                        );
-                      }}
+                    onClick={() => openCallConversation(call)}
                     >
                       <span
                         className="rounded-circle d-flex align-items-center justify-content-center text-white"
