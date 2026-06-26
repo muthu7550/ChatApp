@@ -30,6 +30,7 @@ export default function CallClient() {
 
   const gettingTokenRef = useRef(false);
   const backToChatUrl = room ? `/chat?conversationId=${room}` : "/chat";
+  
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "null");
@@ -44,6 +45,32 @@ export default function CallClient() {
       setError("Call details missing");
     }
   }, [room, callId, router]);
+
+  useEffect(() => {
+  if (screenState !== "ringing") return;
+  if (!callId || token) return;
+
+  const timer = setTimeout(async () => {
+    const authToken = localStorage.getItem("token");
+
+    await fetch("/api/calls", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authToken ? `Bearer ${authToken}` : "",
+      },
+      body: JSON.stringify({
+        callId,
+        status: "missed",
+      }),
+    });
+
+    setToken("");
+    setError("Call missed");
+  }, 30000);
+
+  return () => clearTimeout(timer);
+}, [screenState, callId, token]);
 
   useEffect(() => {
     if (!callId || !user?._id) return;

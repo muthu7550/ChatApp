@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "../../lib/db";
-import Call from "../../models/Call";
+import Call from "../../models/Call"; 
 import Conversation from "../../models/Conversation";
 
 export async function POST(req) {
@@ -47,21 +47,26 @@ export async function GET(req) {
     await dbConnect();
 
     const { searchParams } = new URL(req.url);
+
     const userId = searchParams.get("userId");
     const mode = searchParams.get("mode");
     const callId = searchParams.get("callId");
+    const conversationId = searchParams.get("conversationId");
 
     if (callId) {
-  const call = await Call.findById(callId)
-    .populate("caller", "name avatar")
-    .populate("receiver", "name avatar")
-    .populate("conversation");
+      const call = await Call.findById(callId)
+        .populate("caller", "name avatar")
+        .populate("receiver", "name avatar")
+        .populate("conversation");
 
-  return NextResponse.json({ success: true, call });
-}
+      return NextResponse.json({ success: true, call });
+    }
 
     if (!userId) {
-      return NextResponse.json({ error: "userId required" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "userId required" },
+        { status: 400 }
+      );
     }
 
     if (mode === "ringing") {
@@ -72,14 +77,23 @@ export async function GET(req) {
       })
         .sort({ createdAt: -1 })
         .populate("caller", "name avatar")
+        .populate("receiver", "name avatar")
         .populate("conversation");
 
       return NextResponse.json({ success: true, call });
     }
 
-    const calls = await Call.find({ members: userId })
-      .sort({ createdAt: -1 })
-      .limit(60)
+    const callQuery = {
+      members: userId,
+    };
+
+    if (conversationId) {
+      callQuery.conversation = conversationId;
+    }
+
+    const calls = await Call.find(callQuery)
+      .sort({ createdAt: conversationId ? 1 : -1 })
+      .limit(conversationId ? 200 : 60)
       .populate("caller", "name avatar")
       .populate("receiver", "name avatar")
       .populate("conversation");
@@ -90,9 +104,18 @@ export async function GET(req) {
       status: "missed",
     });
 
-    return NextResponse.json({ success: true, calls, missedCount });
+    return NextResponse.json({
+      success: true,
+      calls,
+      missedCount,
+    });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Get calls error:", error);
+
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
   }
 }
 
@@ -119,5 +142,45 @@ export async function PUT(req) {
     return NextResponse.json({ success: true, call });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req) {
+  try {
+    await dbConnect();
+
+    const { searchParams } = new URL(req.url);
+    const callId = searchParams.get("callId");
+    const userId = searchParams.get("userId");
+
+    if (!callId || !userId) {
+      return NextResponse.json(
+        { success: false, error: "callId and userId are required" },
+        { status: 400 }
+      );
+    }
+
+    const deletedCall = await Call.findOneAndDelete({
+      _id: callId,
+      $or: [{ caller: userId }, { receiver: userId }],
+    });
+
+    if (!deletedCall) {
+      return NextResponse.json(
+        { success: false, error: "Call not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Call deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete call error:", error);
+    return NextResponse.json(
+      { success: false, error: "Delete call failed" },
+      { status: 500 }
+    );
   }
 }

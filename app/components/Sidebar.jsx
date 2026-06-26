@@ -13,15 +13,16 @@ import {
   FaComments,
   FaEye,
   FaTrashAlt,
+  FaPhoneSlash,
   FaEllipsisV,
   FaChevronDown,
   FaUserFriends,
 } from "react-icons/fa";
+
 import { ChatAvatar } from "./Avatar";
 import {
   FaPhoneAlt,
   FaVideo,
-  FaPhoneSlash,
   FaPhoneVolume,
 } from "react-icons/fa";
 
@@ -48,6 +49,7 @@ export default function Sidebar({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [openChatMenuId, setOpenChatMenuId] = useState(null);
+  const [openCallMenuId, setOpenCallMenuId] = useState(null);
 
   const [groupsOpen, setGroupsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
@@ -361,6 +363,80 @@ export default function Sidebar({
     }
   }
 
+  async function clearConversationsByType(type) {
+    const label = type === "group" ? "groups" : "chats";
+    const ok = confirm(`Clear all ${label}?`);
+    if (!ok) return;
+
+    const res = await fetch(
+      `/api/conversations/clear?userId=${currentUser?._id}&type=${type}`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      },
+    );
+
+    if (await handleUnauthorized(res)) return;
+
+    const result = await res.json();
+
+    if (result?.success) {
+      setConversations((prev) => prev.filter((item) => item?.type !== type));
+      onSelectConversation(null);
+      setMobileChatOpen?.(false);
+      router.push("/chat");
+      onRefresh?.();
+      fetchConversations(false);
+    } else {
+      alert(result?.error || `Clear ${label} failed`);
+    }
+  }
+
+  async function clearCalls() {
+    const ok = confirm("Clear all calls?");
+    if (!ok) return;
+
+    const res = await fetch(`/api/calls/clear?userId=${currentUser?._id}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+
+    if (await handleUnauthorized(res)) return;
+
+    const result = await res.json();
+
+    if (result?.success) {
+      setCalls([]);
+      setMissedCallCount(0);
+    } else {
+      alert(result?.error || "Clear calls failed");
+    }
+  }
+
+  async function deleteCall(callId) {
+    const ok = confirm("Remove this call?");
+    if (!ok) return;
+
+    const res = await fetch(
+      `/api/calls?callId=${callId}&userId=${currentUser?._id}`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      },
+    );
+
+    if (await handleUnauthorized(res)) return;
+
+    const result = await res.json();
+
+    if (result?.success) {
+      setCalls((prev) => prev.filter((item) => item?._id !== callId));
+      fetchCalls();
+    } else {
+      alert(result?.error || "Delete call failed");
+    }
+  }
+
   async function handleConversationClick(conversation) {
     const res = await fetch("/api/messages/read", {
       method: "POST",
@@ -576,13 +652,44 @@ export default function Sidebar({
   return (
     <aside className="sidebar-shell d-flex flex-column h-100 w-100 position-relative">
       <style>{`
-        .sidebar-shell {
-          background:
-            radial-gradient(circle at 0% 0%, rgba(255,157,46,.28), transparent 34%),
-            radial-gradient(circle at 100% 16%, rgba(255,91,47,.16), transparent 28%),
-            linear-gradient(180deg, #fff7f1 0%, #ffffff 46%, #fffaf7 100%);
-          color: #111827;
-        }
+    .sidebar-shell {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255,157,46,.28), transparent 34%),
+    radial-gradient(circle at 100% 16%, rgba(255,91,47,.16), transparent 28%),
+    linear-gradient(180deg, #fff7f1 0%, #ffffff 46%, #fffaf7 100%);
+  color: #111827;
+}
+
+.sidebar-fixed-top {
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #fff7f1 0%, #ffffff 100%);
+  z-index: 30;
+}
+
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.tab-missed-badge {
+  margin-left: 6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+}
 
         .sidebar-header {
           background: linear-gradient(135deg, #fff1e7, #ffffff);
@@ -669,7 +776,7 @@ export default function Sidebar({
 
         .chat-filter-row {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(4, 1fr);
           gap: 8px;
         }
 
@@ -856,153 +963,170 @@ export default function Sidebar({
         }
       `}</style>
 
-      <header className="sidebar-header d-flex align-items-center justify-content-between px-3 py-3">
-        <div
-          ref={profileMenuRef}
-          className="d-flex align-items-center gap-3 position-relative overflow-visible min-w-0"
-        >
+      <div className="sidebar-fixed-top">
+        <header className="sidebar-header d-flex align-items-center justify-content-between px-3 py-3">
+          <div
+            ref={profileMenuRef}
+            className="d-flex align-items-center gap-3 position-relative overflow-visible min-w-0"
+          >
+            <button
+              type="button"
+              onClick={() => setShowProfileMenu((prev) => !prev)}
+              className="btn p-0 border-0 rounded-circle flex-shrink-0"
+              title="Profile"
+            >
+              <span className="profile-avatar-ring d-inline-flex">
+                <img
+                  src={getUserAvatar(currentUser)}
+                  className="rounded-circle object-fit-cover"
+                  width="44"
+                  height="44"
+                  alt="profile"
+                />
+              </span>
+            </button>
+
+            {showProfileMenu && (
+              <div className="sidebar-profile-menu">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    setPreviewImage(
+                      currentUser?.avatar || getUserAvatar(currentUser),
+                    );
+                  }}
+                  className="sidebar-profile-menu-item d-flex align-items-center gap-2"
+                >
+                  <FaEye />
+                  View Profile
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleEditProfile}
+                  className="sidebar-profile-menu-item d-flex align-items-center gap-2"
+                >
+                  <FaUserEdit />
+                  Edit Profile
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  className="sidebar-profile-menu-item text-danger d-flex align-items-center gap-2"
+                >
+                  <FaTrashAlt />
+                  Delete Account
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="sidebar-profile-menu-item text-danger d-flex align-items-center gap-2"
+                >
+                  <FaSignOutAlt />
+                  Logout
+                </button>
+              </div>
+            )}
+
+            <div className="overflow-hidden">
+              <h6 className="mb-0 fw-bold text-dark text-truncate">
+                {currentUser?.name || "User"}
+              </h6>
+              <small className="text-secondary">ChatterBox Pro Max</small>
+            </div>
+          </div>
+
           <button
             type="button"
-            onClick={() => setShowProfileMenu((prev) => !prev)}
-            className="btn p-0 border-0 rounded-circle flex-shrink-0"
-            title="Profile"
+            onClick={() => setShowNetwork(true)}
+            className="network-svg-btn flex-shrink-0"
+            title="Our Network"
+            disabled={usersLoading}
           >
-            <span className="profile-avatar-ring d-inline-flex">
-              <img
-                src={getUserAvatar(currentUser)}
-                className="rounded-circle object-fit-cover"
-                width="44"
-                height="44"
-                alt="profile"
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+              <circle
+                cx="6"
+                cy="7"
+                r="3"
+                stroke="currentColor"
+                strokeWidth="2"
               />
-            </span>
+              <circle
+                cx="18"
+                cy="7"
+                r="3"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <circle
+                cx="12"
+                cy="17"
+                r="3"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <path
+                d="M8.5 9.5L10.5 14M15.5 9.5L13.5 14"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
           </button>
+        </header>
 
-          {showProfileMenu && (
-            <div className="sidebar-profile-menu">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowProfileMenu(false);
-                  setPreviewImage(
-                    currentUser?.avatar || getUserAvatar(currentUser),
-                  );
-                }}
-                className="sidebar-profile-menu-item d-flex align-items-center gap-2"
-              >
-                <FaEye />
-                View Profile
-              </button>
+        <div className="p-3 search-wrapper">
+          <div className="input-group sidebar-search  border border-red-100 rounded-4">
+            <span className="input-group-text rounded-start-pill">
+              <FaSearch />
+            </span>
 
-              <button
-                type="button"
-                onClick={handleEditProfile}
-                className="sidebar-profile-menu-item d-flex align-items-center gap-2"
-              >
-                <FaUserEdit />
-                Edit Profile
-              </button>
-
-              <button
-                type="button"
-                onClick={handleDeleteAccount}
-                className="sidebar-profile-menu-item text-danger d-flex align-items-center gap-2"
-              >
-                <FaTrashAlt />
-                Delete Account
-              </button>
-
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="sidebar-profile-menu-item text-danger d-flex align-items-center gap-2"
-              >
-                <FaSignOutAlt />
-                Logout
-              </button>
-            </div>
-          )}
-
-          <div className="overflow-hidden">
-            <h6 className="mb-0 fw-bold text-dark text-truncate">
-              {currentUser?.name || "User"}
-            </h6>
-            <small className="text-secondary">ChatterBox Pro Max</small>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search chats or network users..."
+              className="form-control rounded-end-pill"
+            />
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowNetwork(true)}
-          className="network-svg-btn flex-shrink-0"
-          title="Our Network"
-          disabled={usersLoading}
-        >
-          <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
-            <circle cx="6" cy="7" r="3" stroke="currentColor" strokeWidth="2" />
-            <circle
-              cx="18"
-              cy="7"
-              r="3"
-              stroke="currentColor"
-              strokeWidth="2"
-            />
-            <circle
-              cx="12"
-              cy="17"
-              r="3"
-              stroke="currentColor"
-              strokeWidth="2"
-            />
-            <path
-              d="M8.5 9.5L10.5 14M15.5 9.5L13.5 14"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
-      </header>
-
-      <div className="p-3 search-wrapper">
-        <div className="input-group sidebar-search  border border-red-100 rounded-4">
-          <span className="input-group-text rounded-start-pill">
-            <FaSearch />
-          </span>
-
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search chats or network users..."
-            className="form-control rounded-end-pill"
-          />
-        </div>
+        {!isSearching && (
+          <div className="chat-filter-row px-3 pb-3">
+            {[
+              { key: "all", label: "All" },
+              { key: "chats", label: "Chats" },
+              { key: "groups", label: "Groups" },
+              {
+                key: "calls",
+                label: (
+                  <>
+                    Calls
+                    {missedCallCount > 0 && (
+                      <span className="tab-missed-badge">
+                        {missedCallCount}
+                      </span>
+                    )}
+                  </>
+                ),
+              },
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setActiveFilter(item.key)}
+                className={`chat-filter-btn ${
+                  activeFilter === item.key ? "active" : ""
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-
-      {!isSearching && (
-        <div className="chat-filter-row px-3 pb-3">
-          {[
-            { key: "all", label: "All" },
-            { key: "chats", label: "Chats" },
-            { key: "groups", label: "Groups" },
-            {
-              key: "calls",
-              label: `Calls ${missedCallCount ? missedCallCount : ""}`,
-            },
-          ].map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setActiveFilter(item.key)}
-              className={`chat-filter-btn ${
-                activeFilter === item.key ? "active" : ""
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       <section className="sidebar-scroll flex-grow-1 overflow-auto pb-3">
         {activeFilter === "calls" && !isSearching && (
@@ -1013,8 +1137,20 @@ export default function Sidebar({
                 Calls
               </span>
 
-              <span className="badge bg-white text-dark rounded-pill">
-                {calls.length}
+              <span className="sidebar-accordion-actions">
+                <button
+                  type="button"
+                  className="accordion-action-btn"
+                  title="Clear calls"
+                  onClick={clearCalls}
+                  disabled={calls.length === 0}
+                >
+                  <FaTrashAlt size={13} />
+                </button>
+
+                <span className="badge bg-white text-dark rounded-pill">
+                  {calls.length}
+                </span>
               </span>
             </div>
 
@@ -1022,53 +1158,88 @@ export default function Sidebar({
               calls.map((call) => {
                 const isOutgoing = call?.caller?._id === currentUser?._id;
                 const person = isOutgoing ? call?.receiver : call?.caller;
+                const isCallMenuOpen = openCallMenuId === call?._id;
 
                 return (
-                  <button
-                    key={call?._id}
-                    type="button"
-                    className="network-result-item"
-                    onClick={() => {
-                      router.push(
-                        `/chat?conversationId=${
-                          call?.conversation?._id || call?.conversation
-                        }`,
-                      );
-                    }}
-                  >
-                    <span
-                      className="rounded-circle d-flex align-items-center justify-content-center text-white"
-                      style={{
-                        width: 44,
-                        height: 44,
-                        background:
-                          call?.status === "missed"
-                            ? "#ef4444"
-                            : "linear-gradient(135deg,#ff9d2e,#ff5b2f)",
+                  <div key={call?._id} className="position-relative">
+                    <button
+                      type="button"
+                      className="network-result-item"
+                      onClick={() => {
+                        router.push(
+                          `/chat?conversationId=${
+                            call?.conversation?._id || call?.conversation
+                          }`,
+                        );
                       }}
                     >
-                      {call?.type === "video" ? <FaVideo /> : <FaPhoneAlt />}
-                    </span>
+                      <span
+                        className="rounded-circle d-flex align-items-center justify-content-center text-white"
+                        style={{
+                          width: 44,
+                          height: 44,
+                          background:
+                            call?.status === "missed"
+                              ? "#ef4444"
+                              : "linear-gradient(135deg,#ff9d2e,#ff5b2f)",
+                        }}
+                      >
+                        {call?.type === "video" ? <FaVideo /> : <FaPhoneAlt />}
+                      </span>
 
-                    <div className="flex-grow-1 overflow-hidden">
-                      <div className="fw-bold text-dark text-truncate">
-                        {person?.name || "Unknown User"}
+                      <div className="flex-grow-1 overflow-hidden">
+                        <div className="fw-bold text-dark text-truncate">
+                          {person?.name || "Unknown User"}
+                        </div>
+
+                        <small className="text-secondary d-block text-truncate">
+                          {isOutgoing ? "Outgoing" : "Incoming"} {call?.type}{" "}
+                          call · {call?.status}
+                        </small>
                       </div>
 
-                      <small className="text-secondary d-block text-truncate">
-                        {isOutgoing ? "Outgoing" : "Incoming"} {call?.type} call
-                        · {call?.status}
-                      </small>
-                    </div>
+                      {call?.status === "missed" && (
+                        <FaPhoneSlash className="text-danger" />
+                      )}
 
-                    {call?.status === "missed" && (
-                      <FaPhoneSlash className="text-danger" />
-                    )}
+                      {call?.status === "accepted" && (
+                        <FaPhoneVolume className="text-success" />
+                      )}
+                    </button>
 
-                    {call?.status === "accepted" && (
-                      <FaPhoneVolume className="text-success" />
+                    <button
+                      type="button"
+                      className="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle border-0 text-secondary"
+                      style={{ width: 32, height: 32, background: "#fff7f1" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenCallMenuId((prev) =>
+                          prev === call?._id ? null : call?._id,
+                        );
+                      }}
+                    >
+                      <FaEllipsisV size={12} />
+                    </button>
+
+                    {isCallMenuOpen && (
+                      <div
+                        className="position-absolute end-0 top-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden"
+                        style={{ width: 170, zIndex: 9999 }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenCallMenuId(null);
+                            deleteCall(call?._id);
+                          }}
+                          className="btn w-100 text-start border-0 rounded-0 px-3 py-3 text-danger d-flex align-items-center gap-2"
+                        >
+                          <FaTrashAlt size={14} />
+                          <span className="small fw-semibold">Delete call</span>
+                        </button>
+                      </div>
                     )}
-                  </button>
+                  </div>
                 );
               })
             ) : (
@@ -1121,15 +1292,17 @@ export default function Sidebar({
           </>
         ) : (
           <>
-          {activeFilter !== "calls" && activeFilter !== "chats" && (
+            {activeFilter !== "calls" && activeFilter !== "chats" && (
               <AccordionSection
                 title="Groups"
                 icon={<FaUsers />}
                 count={groupChats.length}
                 open={groupsOpen}
                 onToggle={() => setGroupsOpen((prev) => !prev)}
-                actionIcon={groupChats.length > 0 ? <FaPlus /> : null}
-                onAction={() => setShowGroup(true)}
+               actionIcon={<FaPlus />}
+onAction={() => setShowGroup(true)}
+clearIcon={groupChats.length > 0 ? <FaTrashAlt /> : null}
+onClear={() => clearConversationsByType("group")}
               >
                 {conversationsLoading ? (
                   <SidebarSkeleton count={3} />
@@ -1156,15 +1329,17 @@ export default function Sidebar({
               </AccordionSection>
             )}
 
-           {activeFilter !== "calls" && activeFilter !== "groups" && (
+            {activeFilter !== "calls" && activeFilter !== "groups" && (
               <AccordionSection
                 title="Chats"
                 icon={<FaComments />}
                 count={privateChats.length}
                 open={chatsOpen}
                 onToggle={() => setChatsOpen((prev) => !prev)}
-                actionIcon={privateChats.length > 0 ? <FaPlus /> : null}
-                onAction={() => setShowNetwork(true)}
+                actionIcon={<FaPlus />}
+onAction={() => setShowNetwork(true)}
+clearIcon={privateChats.length > 0 ? <FaTrashAlt /> : null}
+onClear={() => clearConversationsByType("direct")}
               >
                 {conversationsLoading ? (
                   <SidebarSkeleton count={5} />
@@ -1268,6 +1443,8 @@ function AccordionSection({
   onToggle,
   actionIcon,
   onAction,
+  clearIcon,
+  onClear,
   children,
 }) {
   return (
@@ -1284,19 +1461,35 @@ function AccordionSection({
         </span>
 
         <span className="sidebar-accordion-actions">
-          {actionIcon && (
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(e) => {
-                e.stopPropagation();
-                onAction?.();
-              }}
-              className="accordion-action-btn"
-            >
-              {actionIcon}
-            </span>
-          )}
+      {clearIcon && (
+  <span
+    role="button"
+    tabIndex={0}
+    title={`Clear ${title}`}
+    onClick={(e) => {
+      e.stopPropagation();
+      onClear?.();
+    }}
+    className="accordion-action-btn"
+  >
+    {clearIcon}
+  </span>
+)}
+
+{actionIcon && (
+  <span
+    role="button"
+    tabIndex={0}
+    title={`Add ${title}`}
+    onClick={(e) => {
+      e.stopPropagation();
+      onAction?.();
+    }}
+    className="accordion-action-btn"
+  >
+    {actionIcon}
+  </span>
+)}
 
           <FaChevronDown
             className={`accordion-chevron ${open ? "open" : ""}`}

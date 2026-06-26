@@ -7,11 +7,13 @@ import {
   FaPhoneAlt,
   FaVideo,
   FaCommentDots,
+  FaPhoneSlash,
 } from "react-icons/fa";
 
 import Composer from "./Composer";
 import MessageBubble from "./MessageBubble";
 import { ChatAvatar } from "./Avatar";
+
 
 export default function ChatWindow({
   currentUser,
@@ -32,7 +34,8 @@ export default function ChatWindow({
 
   const [activeConversation, setActiveConversation] = useState(conversation || null);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
-  const [messages, setMessages] = useState([]);
+const [messages, setMessages] = useState([]);
+const [chatCalls, setChatCalls] = useState([]);
   const [initialChatLoading, setInitialChatLoading] = useState(false);
   const [showRealChat, setShowRealChat] = useState(false);
   const [isPreparingReveal, setIsPreparingReveal] = useState(false);
@@ -54,8 +57,9 @@ export default function ChatWindow({
   useEffect(() => {
     if (!conversationIdFromUrl) {
       setActiveConversation(null);
-      setMessages([]);
-      setShowRealChat(false);
+setMessages([]);
+setChatCalls([]);
+setShowRealChat(false);
       setIsPreparingReveal(false);
       loadedConversationRef.current = null;
       pendingMessagesRef.current = [];
@@ -119,7 +123,8 @@ export default function ChatWindow({
     setIsPreparingReveal(false);
     setInitialChatLoading(true);
 
-    fetchMessages(true);
+  fetchMessages(true);
+fetchChatCalls();
   }, [activeConversation?._id, currentUser?._id]);
 
   useEffect(() => {
@@ -171,6 +176,23 @@ export default function ChatWindow({
       }
     }
   }
+
+  async function fetchChatCalls() {
+  if (!activeConversation?._id || !currentUser?._id) return;
+
+  try {
+    const res = await fetch(
+      `/api/calls?userId=${currentUser._id}&conversationId=${activeConversation._id}`,
+      { headers: authHeaders }
+    );
+
+    const result = await res.json();
+    setChatCalls(result?.calls || []);
+  } catch (error) {
+    console.error("Fetch chat calls error:", error);
+    setChatCalls([]);
+  }
+}
 
   useLayoutEffect(() => {
     if (!isPreparingReveal) return;
@@ -375,11 +397,25 @@ export default function ChatWindow({
     return receiver?.name || "User";
   }
 
-  const loadingChat =
+const chatTimeline = [
+  ...messages.map((item) => ({
+    type: "message",
+    createdAt: item?.createdAt,
+    data: item,
+  })),
+  ...chatCalls.map((item) => ({
+    type: "call",
+    createdAt: item?.createdAt,
+    data: item,
+  })),
+].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+const loadingChat =
     isHydratingConversation ||
     initialChatLoading ||
     isPreparingReveal ||
     !showRealChat;
+    
 
   function renderHeader() {
     return (
@@ -487,6 +523,48 @@ export default function ChatWindow({
           overflow-anchor: none;
         }
 
+        .call-chat-event-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin: 10px 0;
+}
+
+.call-chat-event {
+  max-width: 78%;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.call-chat-event.missed {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.call-chat-event.rejected {
+  background: #ffedd5;
+  color: #ea580c;
+}
+
+.call-chat-event.accepted {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.call-chat-event.ringing {
+  background: #e0f2fe;
+  color: #0284c7;
+}
+
+
         .real-message-layer.hidden-before-reveal {
           visibility: hidden;
           pointer-events: none;
@@ -549,26 +627,34 @@ export default function ChatWindow({
         ref={chatBodyRef}
         className="chat-body flex-grow-1 min-h-0 overflow-auto"
       >
-        {messages.length > 0 && (
-          <div
-            ref={messageListRef}
-            className={`real-message-layer chat-message-list chat-message-enter ${
-              !showRealChat ? "hidden-before-reveal" : ""
-            }`}
-          >
-            {messages.map((message) => (
-              <MessageBubble
-                key={message?._id}
-                message={message}
-                isOwnMessage={message?.sender?._id === currentUser?._id}
-                onDeleteMessage={deleteMessage}
-                onPreviewImage={setPreviewImage}
-              />
-            ))}
-          </div>
-        )}
+   {chatTimeline.length > 0 && (
+  <div
+    ref={messageListRef}
+    className={`real-message-layer chat-message-list chat-message-enter ${
+      !showRealChat ? "hidden-before-reveal" : ""
+    }`}
+  >
+    {chatTimeline.map((item) =>
+      item.type === "call" ? (
+        <CallChatEvent
+          key={`call-${item.data?._id}`}
+          call={item.data}
+          currentUser={currentUser}
+        />
+      ) : (
+        <MessageBubble
+          key={item.data?._id}
+          message={item.data}
+          isOwnMessage={item.data?.sender?._id === currentUser?._id}
+          onDeleteMessage={deleteMessage}
+          onPreviewImage={setPreviewImage}
+        />
+      )
+    )}
+  </div>
+)}
 
-        {showRealChat && messages.length === 0 && (
+       {showRealChat && chatTimeline.length === 0 && (
           <EmptyChat onQuickMessage={sendQuickMessage} title={getChatTitle()} />
         )}
 
@@ -615,6 +701,70 @@ export default function ChatWindow({
         </div>
       )}
     </main>
+  );
+}
+
+function CallChatEvent({ call, currentUser }) {
+  const isOutgoing = call?.caller?._id === currentUser?._id;
+  const status = call?.status || "ringing";
+  const callType = call?.type === "video" ? "video" : "audio";
+
+  function formatCallTime(dateValue) {
+    if (!dateValue) return "";
+
+    return new Date(dateValue).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  const callTime = formatCallTime(call?.createdAt);
+
+  const getText = () => {
+    if (status === "missed") {
+      return `Missed ${callType} call`;
+    }
+
+    if (status === "rejected") {
+      return isOutgoing
+        ? `${callType} call declined`
+        : `You declined ${callType} call`;
+    }
+
+    if (status === "accepted") {
+      return isOutgoing
+        ? `Outgoing ${callType} call`
+        : `Incoming ${callType} call`;
+    }
+
+    return isOutgoing
+      ? `Outgoing ${callType} call`
+      : `Incoming ${callType} call`;
+  };
+
+  const Icon =
+    status === "missed" || status === "rejected"
+      ? FaPhoneSlash
+      : status === "accepted"
+        ? FaPhoneVolume
+        : callType === "video"
+          ? FaVideo
+          : FaPhoneAlt;
+
+  return (
+    <div className="call-chat-event-wrap">
+      <div className={`call-chat-event ${status}`}>
+        <Icon size={11} />
+        <span>{getText()}</span>
+
+        {callTime && (
+          <>
+            <span className="call-event-dot">•</span>
+            <span className="call-event-time">{callTime}</span>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

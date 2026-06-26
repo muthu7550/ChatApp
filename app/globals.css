@@ -757,3 +757,14 @@ button.rounded-circle {
   visibility: hidden;
   pointer-events: none;
 }
+
+.call-event-dot {
+  opacity: 0.6;
+  font-size: 10px;
+}
+
+.call-event-time {
+  opacity: 0.75;
+  font-size: 10px;
+  font-weight: 800;
+}
