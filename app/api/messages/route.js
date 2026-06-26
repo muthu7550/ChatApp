@@ -104,10 +104,9 @@ await Conversation.findByIdAndUpdate(conversationId, {
   updatedAt: new Date(),
 
   // restore sender side chat list + allow new messages to show
-  $pull: {
-    hiddenFor: senderId,
-    clearedFor: { user: senderId },
-  },
+$pull: {
+  hiddenFor: senderId,
+},
 });
     const populatedMessage = await Message.findById(message?._id).populate(
       "sender",

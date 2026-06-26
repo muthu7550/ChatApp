@@ -661,11 +661,11 @@ const groupUnreadCount = groupChats.reduce(
             <FaEllipsisV size={12} />
           </button>
 
-          {isMenuOpen && (
-            <div
-              className="position-absolute end-0 top-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden"
-              style={{ width: 190, zIndex: 9999 }}
-            >
+         {isMenuOpen && (
+  <div
+    className="chat-action-menu bg-white border rounded-4 shadow-lg overflow-hidden"
+    style={{ width: 190 }}
+  >
               <button
                 type="button"
                 onClick={() => {
@@ -1294,11 +1294,11 @@ const groupUnreadCount = groupChats.reduce(
                       <FaEllipsisV size={12} />
                     </button>
 
-                    {isCallMenuOpen && (
-                      <div
-                        className="position-absolute end-0 top-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden"
-                        style={{ width: 170, zIndex: 9999 }}
-                      >
+                 {isCallMenuOpen && (
+  <div
+    className="chat-action-menu bg-white border rounded-4 shadow-lg overflow-hidden"
+    style={{ width: 170 }}
+  >
                         <button
                           type="button"
                           onClick={() => {

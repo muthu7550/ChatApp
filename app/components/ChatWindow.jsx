@@ -8,6 +8,7 @@ import {
   FaVideo,
   FaCommentDots,
   FaPhoneSlash,
+  FaPhoneVolume,
 } from "react-icons/fa";
 
 import Composer from "./Composer";
@@ -132,7 +133,7 @@ fetchChatCalls();
 
     const interval = setInterval(() => {
       fetchMessages(false);
-    }, 30000);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [activeConversation?._id, currentUser?._id]);
@@ -160,6 +161,7 @@ fetchChatCalls();
     }
 
     const nextMessages = result?.messages || [];
+    markActiveChatAsRead();
 
     if (loadedConversationRef.current !== conversationId) return;
 
@@ -198,6 +200,29 @@ fetchChatCalls();
   } catch (error) {
     console.error("Fetch chat calls error:", error);
     setChatCalls([]);
+  }
+}
+
+
+async function markActiveChatAsRead() {
+  if (!activeConversation?._id || !currentUser?._id) return;
+
+  try {
+    await fetch("/api/messages/read", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+      body: JSON.stringify({
+        conversationId: activeConversation._id,
+        userId: currentUser._id,
+      }),
+    });
+
+    onRefreshConversations?.();
+  } catch (error) {
+    console.error("Mark read error:", error);
   }
 }
 
@@ -316,9 +341,11 @@ fetchChatCalls();
       }
 
       setMessages((prev) => [...prev, result.message]);
-      setTimeout(() => {
+setTimeout(() => {
   fetchMessages(false);
-}, 500);
+  fetchChatCalls();
+}, 100);
+
       setShowRealChat(true);
       onRefreshConversations?.();
 
@@ -430,7 +457,16 @@ const loadingChat =
   function renderHeader() {
     return (
       <header className="chat-header d-flex align-items-center justify-content-between px-2 px-sm-3">
-        <div className="d-flex align-items-center min-w-0">
+       <div
+  className="d-flex align-items-center min-w-0 flex-grow-1"
+  role="button"
+  tabIndex={0}
+  onClick={() => {
+    if (activeConversation?._id) {
+      router.push(`/chat/info?conversationId=${activeConversation._id}`);
+    }
+  }}
+>
           <button
             type="button"
             onClick={onBack}
