@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import dbConnect from "../../../../lib/dbConnect";
-import Conversation from "../../../../models/Conversation";
-import Message from "../../../../models/Message";
+import dbConnect from "../../../lib/dbConnect";
+import Conversation from "../../../models/Conversation";
+import Message from "../../../models/Message";
 
 export async function DELETE(req) {
   try {
