@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { dbConnect } from "../../../lib/db";
 import User from "../../../models/User";
 import { createToken } from "../../../lib/jwt";
-import { getFirebaseAdminAuth } from "../../../lib/firebaseAdmin";
+
+export const runtime = "nodejs";
 
 export async function POST(req) {
   try {
@@ -16,6 +17,10 @@ export async function POST(req) {
         { status: 400 }
       );
     }
+
+    const { getFirebaseAdminAuth } = await import(
+      "../../../lib/firebaseAdmin"
+    );
 
     const decoded = await getFirebaseAdminAuth().verifyIdToken(idToken);
 
@@ -39,6 +44,7 @@ export async function POST(req) {
         phone,
         firebaseUid,
         avatar: "",
+        blockedUsers: [],
       });
     }
 
@@ -57,6 +63,7 @@ export async function POST(req) {
         phone: user.phone || "",
         avatar: user.avatar || "",
         about: user.about || "",
+        blockedUsers: user.blockedUsers || [],
       },
     });
   } catch (error) {
