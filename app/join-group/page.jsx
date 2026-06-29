@@ -258,25 +258,6 @@ setPendingApproval(
               {group?.membersCount || 0} members
             </p>
 
-            {pendingApproval && (
-              <>
-                <div
-                  className="rounded-4 p-3 mb-4 fw-semibold"
-                  style={{ background: "#fff3cd", color: "#b45309" }}
-                >
-                  ⏳ Your join request is pending admin approval.
-                </div>
-
-                <button
-                  type="button"
-                  onClick={goBack}
-                  className="btn join-secondary-btn rounded-4 py-3 fw-bold w-100"
-                >
-                  Back
-                </button>
-              </>
-            )}
-
             {pendingApproval ? (
               <>
                 <div

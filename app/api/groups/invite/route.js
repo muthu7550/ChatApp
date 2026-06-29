@@ -23,25 +23,6 @@ export async function GET(req) {
       );
     }
 
-    const pendingApproval = group.joinRequests?.some(
-  (req) => req.user?._id?.toString() === userId && req.status === "pending"
-);
-
-return NextResponse.json({
-  success: true,
-  alreadyMember,
-  pendingApproval,
-  group: {
-    _id: group._id,
-    name: group.name,
-    avatar: group.avatar || "",
-    membersCount: group.members.length,
-    joinApproval: group.joinApproval,
-    alreadyMember,
-    pendingApproval,
-  },
-});
-
     const conversationId = getConversationIdFromInvite(invite);
 
     const group = await Conversation.findOne({
@@ -61,6 +42,12 @@ return NextResponse.json({
       (id) => id.toString() === userId
     );
 
+    const pendingApproval = group.joinRequests?.some(
+      (req) =>
+        (req.user?._id || req.user)?.toString() === userId &&
+        req.status === "pending"
+    );
+
     return NextResponse.json({
       success: true,
       alreadyMember,
@@ -76,6 +63,8 @@ return NextResponse.json({
       },
     });
   } catch (error) {
+    console.error("INVITE GET ERROR:", error);
+
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -95,36 +84,6 @@ export async function POST(req) {
         { status: 400 }
       );
     }
-
-    if (group.joinApproval) {
-  const alreadyRequested = group.joinRequests?.some(
-    (req) => req.user?.toString() === userId && req.status === "pending"
-  );
-
-  if (!alreadyRequested) {
-    group.joinRequests.push({
-      user: userId,
-      status: "pending",
-      requestedAt: new Date(),
-    });
-
-    await group.save();
-
-    const requestedUser = await User.findById(userId).select("name");
-
-    await sendPushToUsers(group.admins, {
-      title: "New group join request",
-      body: `${requestedUser?.name || "Someone"} requested to join ${group.name}`,
-    });
-  }
-
-  return NextResponse.json({
-    success: true,
-    pendingApproval: true,
-    message: "Join request sent to admins",
-    group,
-  });
-}
 
     const conversationId = getConversationIdFromInvite(invite);
 
@@ -208,6 +167,8 @@ export async function POST(req) {
       group,
     });
   } catch (error) {
+    console.error("INVITE POST ERROR:", error);
+
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

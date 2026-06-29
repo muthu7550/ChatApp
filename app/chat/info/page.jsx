@@ -1350,64 +1350,6 @@ function ChatInfoContent() {
                     })}
                   </div>
                 )}
-                {isAdmin && pendingJoinRequests.length > 0 && (
-                  <div
-                    className="mb-4 rounded-4 p-3"
-                    style={{ background: "#fff7f1" }}
-                  >
-                    <div className="section-title">Pending Join Requests</div>
-
-                    {pendingJoinRequests.map((request) => {
-                      const user = request?.user;
-
-                      return (
-                        <div
-                          key={request?._id}
-                          className="d-flex align-items-center gap-3 bg-white rounded-4 p-3 mb-2 border"
-                        >
-                          <img
-                            src={user?.avatar || "/default-avatar.png"}
-                            width="46"
-                            height="46"
-                            className="rounded-circle object-fit-cover"
-                            alt=""
-                          />
-
-                          <div className="flex-grow-1 min-w-0">
-                            <div className="fw-bold text-truncate">
-                              {user?.name || "User"}
-                            </div>
-                            <small className="text-secondary">
-                              Waiting for approval
-                            </small>
-                          </div>
-
-                          <button
-                            className="btn btn-sm btn-success rounded-pill fw-bold"
-                            onClick={() =>
-                              updateGroup("approve_join_request", {
-                                targetUserId: user?._id,
-                              }).then(() => loadInfo())
-                            }
-                          >
-                            Approve
-                          </button>
-
-                          <button
-                            className="btn btn-sm btn-outline-danger rounded-pill fw-bold"
-                            onClick={() =>
-                              updateGroup("reject_join_request", {
-                                targetUserId: user?._id,
-                              }).then(() => loadInfo())
-                            }
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
 
                 <div className="members-list">
                   {sortedMembers.map((member) => {
