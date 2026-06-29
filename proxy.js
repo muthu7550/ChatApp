@@ -4,20 +4,24 @@ import { jwtVerify } from "jose";
 export async function proxy(req) {
   const path = req.nextUrl.pathname;
 
- const publicRoutes = [
+const publicRoutes = [
   "/auth/login",
   "/auth/register",
   "/auth/forgot-password",
+
   "/api/auth/login",
   "/api/auth/register",
   "/api/auth/phone-login",
-];
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+  "/api/auth/send-otp",
+  "/api/auth/verify-otp",
+];  
 
-  const isPublicRoute = publicRoutes.some((route) =>
-    path === route || path.startsWith(`${route}/`)
+  const isPublicRoute = publicRoutes.some(
+    (route) => path === route || path.startsWith(`${route}/`)
   );
 
-  // Do not check token for login/register APIs
   if (isPublicRoute) {
     return NextResponse.next();
   }
@@ -41,7 +45,6 @@ export async function proxy(req) {
 
   try {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-
     await jwtVerify(token, secret);
 
     return NextResponse.next();

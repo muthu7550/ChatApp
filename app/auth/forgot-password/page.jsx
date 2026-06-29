@@ -4,14 +4,24 @@ import Link from "next/link";
 import { useState } from "react";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState({
+    email: "",
+    otp: "",
+    password: "",
+    confirmPassword: "",
+  });
   const [loading, setLoading] = useState(false);
-  const [modal, setModal] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  async function handleSubmit(e) {
+  function updateField(name, value) {
+    setForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  async function sendOtp(e) {
     e.preventDefault();
 
-    if (!email.trim()) {
+    if (!form.email.trim()) {
       alert("Email is required");
       return;
     }
@@ -19,99 +29,203 @@ export default function ForgotPasswordPage() {
     try {
       setLoading(true);
 
-      await fetch("/api/auth/forgot-password", {
+      const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: form.email.trim().toLowerCase() }),
       });
 
-      setModal(true);
-    } catch (error) {
-      console.error(error);
-      alert("Something went wrong");
+      const result = await res.json().catch(() => null);
+
+      if (!res.ok || !result?.success) {
+        alert(result?.error || "OTP send failed");
+        return;
+      }
+
+      setStep(2);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function resetPassword(e) {
+    e.preventDefault();
+
+    if (!form.otp.trim()) {
+      alert("OTP is required");
+      return;
+    }
+
+    if (form.password.length < 6) {
+      alert("Password must be at least 6 characters");
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email.trim().toLowerCase(),
+          otp: form.otp.trim(),
+          password: form.password,
+        }),
+      });
+
+      const result = await res.json().catch(() => null);
+
+      if (!res.ok || !result?.success) {
+        alert(result?.error || "Password reset failed");
+        return;
+      }
+
+      setSuccess(true);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[linear-gradient(135deg,#ff9d2e,#ff5b2f)] px-4">
-      <div className="absolute left-[10%] top-[15%] h-44 w-44 animate-[blob_8s_ease-in-out_infinite] rounded-full bg-white/25 blur-3xl" />
-      <div className="absolute bottom-[15%] right-[10%] h-56 w-56 animate-[blob_8s_ease-in-out_infinite_2s] rounded-full bg-white/25 blur-3xl" />
+    <main className="min-vh-100 d-flex align-items-center justify-content-center px-3 position-relative overflow-hidden"
+      style={{ background: "linear-gradient(135deg,#ff9d2e,#ff5b2f)" }}
+    >
+      <div className="position-absolute rounded-circle bg-white opacity-25 blur"
+        style={{ width: 220, height: 220, top: "12%", left: "8%", filter: "blur(55px)" }}
+      />
+      <div className="position-absolute rounded-circle bg-white opacity-25"
+        style={{ width: 260, height: 260, bottom: "10%", right: "8%", filter: "blur(65px)" }}
+      />
 
-      <section className="relative z-10 w-full max-w-md animate-[cardEnter_.6s_ease] rounded-[30px] border border-white/60 bg-white p-8 shadow-2xl">
-        <div className="mx-auto mb-6 grid h-16 w-16 animate-[float_3s_ease-in-out_infinite] place-items-center rounded bg-[linear-gradient(135deg,#ff9d2e,#ff5b2f)] text-3xl font-black text-white">
+      <section className="bg-white shadow-lg position-relative w-100 p-4 p-sm-5"
+        style={{ maxWidth: 460, borderRadius: 34 }}
+      >
+        <div className="mx-auto mb-4 d-flex align-items-center justify-content-center text-white fw-black"
+          style={{
+            width: 76,
+            height: 76,
+            borderRadius: 24,
+            background: "linear-gradient(135deg,#ff9d2e,#ff5b2f)",
+            fontSize: 36,
+          }}
+        >
           🔐
         </div>
 
-        <h1 className="text-center text-3xl font-black text-zinc-900">
-          Reset Password
-        </h1>
+        {!success ? (
+          <>
+            <h1 className="text-center fw-bold mb-2">
+              {step === 1 ? "Forgot Password?" : "Verify OTP"}
+            </h1>
 
-        <p className="mt-3 text-center text-sm text-zinc-500">
-          Enter your email to receive reset instructions.
-        </p>
+            <p className="text-center text-secondary small mb-4">
+              {step === 1
+                ? "Enter your email and we will send a secure OTP."
+                : `OTP sent to ${form.email}`}
+            </p>
 
-        <form onSubmit={handleSubmit} className="mt-7 space-y-4">
-          <input
-            type="email"
-            placeholder="Email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded border border-orange-200 bg-orange-50/70 p-4 text-zinc-900 outline-none transition focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-500/10"
-          />
+            {step === 1 ? (
+              <form onSubmit={sendOtp}>
+                <input
+                  type="email"
+                  placeholder="Email address"
+                  value={form.email}
+                  onChange={(e) => updateField("email", e.target.value)}
+                  className="form-control form-control-lg rounded-4 mb-3 border-warning-subtle"
+                />
 
-          <button
-            disabled={loading}
-            className="w-full rounded bg-[linear-gradient(135deg,#ff9d2e,#ff5b2f)] p-4 font-black text-white shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl disabled:opacity-60"
-          >
-            {loading ? "Sending..." : "Send Reset Link"}
-          </button>
-        </form>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn w-100 rounded-4 py-3 fw-bold text-white border-0"
+                  style={{ background: "linear-gradient(135deg,#ff9d2e,#ff5b2f)" }}
+                >
+                  {loading ? "Sending OTP..." : "Send OTP"}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={resetPassword}>
+                <input
+                  placeholder="Enter 6 digit OTP"
+                  value={form.otp}
+                  onChange={(e) => updateField("otp", e.target.value)}
+                  className="form-control form-control-lg rounded-4 mb-3 text-center fw-bold"
+                  maxLength={6}
+                />
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <Link
-            href="/auth/login"
-            className="rounded border border-orange-200 p-3 text-center text-sm font-black text-orange-600 no-underline transition hover:bg-orange-50"
-          >
-            Login
-          </Link>
+                <input
+                  type="password"
+                  placeholder="New password"
+                  value={form.password}
+                  onChange={(e) => updateField("password", e.target.value)}
+                  className="form-control form-control-lg rounded-4 mb-3"
+                />
 
-          <Link
-            href="/"
-            className="rounded border border-orange-200 p-3 text-center text-sm font-black text-orange-600 no-underline transition hover:bg-orange-50"
-          >
-            Home
-          </Link>
-        </div>
-      </section>
+                <input
+                  type="password"
+                  placeholder="Confirm password"
+                  value={form.confirmPassword}
+                  onChange={(e) => updateField("confirmPassword", e.target.value)}
+                  className="form-control form-control-lg rounded-4 mb-3"
+                />
 
-      {modal && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4">
-          <div className="w-full max-w-sm animate-[cardEnter_.4s_ease] rounded-[28px] bg-white p-7 text-center shadow-2xl">
-            <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500 text-3xl font-black text-white">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn w-100 rounded-4 py-3 fw-bold text-white border-0"
+                  style={{ background: "linear-gradient(135deg,#ff9d2e,#ff5b2f)" }}
+                >
+                  {loading ? "Resetting..." : "Reset Password"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="btn btn-light w-100 rounded-4 py-3 fw-bold mt-2"
+                >
+                  Change Email
+                </button>
+              </form>
+            )}
+
+            <div className="d-flex gap-2 mt-4">
+              <Link href="/auth/login" className="btn btn-light flex-fill rounded-4 fw-bold">
+                Login
+              </Link>
+              <Link href="/" className="btn btn-light flex-fill rounded-4 fw-bold">
+                Home
+              </Link>
+            </div>
+          </>
+        ) : (
+          <div className="text-center">
+            <div className="mx-auto mb-3 d-flex align-items-center justify-content-center text-white bg-success rounded-circle"
+              style={{ width: 76, height: 76, fontSize: 34 }}
+            >
               ✓
             </div>
 
-            <h2 className="mt-5 text-2xl font-black text-zinc-900">
-              Email Sent
-            </h2>
-
-            <p className="mt-2 text-sm text-zinc-500">
-              Check your inbox for reset instructions.
+            <h2 className="fw-bold">Password Reset Done</h2>
+            <p className="text-secondary small">
+              Your password has been updated successfully.
             </p>
 
             <Link
-              href="/"
-              className="mt-6 block rounded bg-[linear-gradient(135deg,#ff9d2e,#ff5b2f)] p-4 font-black text-white no-underline transition hover:-translate-y-1"
+              href="/auth/login"
+              className="btn w-100 rounded-4 py-3 fw-bold text-white border-0 mt-3"
+              style={{ background: "linear-gradient(135deg,#ff9d2e,#ff5b2f)" }}
             >
-              Return to Home
+              Login Now
             </Link>
           </div>
-        </div>
-      )}
+        )}
+      </section>
     </main>
   );
 }
