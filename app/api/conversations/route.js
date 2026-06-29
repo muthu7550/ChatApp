@@ -92,7 +92,7 @@ export async function POST(req) {
 
       if (exists) {
         const populatedExists = await Conversation.findById(exists?._id)
-          .populate("members", "name email avatar about isOnline lastSeen")
+         .populate("members", "name email avatar about isOnline lastSeen blockedUsers")
           .populate({
             path: "lastMessage",
             populate: {
@@ -116,7 +116,7 @@ export async function POST(req) {
       const populatedConversation = await Conversation.findById(
         conversation?._id
       )
-        .populate("members", "name email avatar about isOnline lastSeen")
+      .populate("members", "name email avatar about isOnline lastSeen blockedUsers")
         .populate("admins", "name email avatar");
 
       return NextResponse.json({
@@ -137,7 +137,7 @@ export async function POST(req) {
       const populatedConversation = await Conversation.findById(
         conversation?._id
       )
-        .populate("members", "name email avatar about isOnline lastSeen")
+       .populate("members", "name email avatar about isOnline lastSeen blockedUsers")
         .populate("admins", "name email avatar");
 
       return NextResponse.json({

@@ -39,24 +39,35 @@ export async function PATCH(req) {
 
     const isAdmin = group.admins.some((id) => id.toString() === userId);
 
-    const adminOnlyActions = [
-      "add_member",
-      "add_members",
-      "remove_member",
-      "promote_admin",
-      "demote_admin",
-      "update_description",
-      "update_settings",
-"approve_join_request",
-"reject_join_request",
-    ];
+  const adminOnlyActions = [
+  "remove_member",
+  "promote_admin",
+  "demote_admin",
+  "update_description",
+  "update_settings",
+  "approve_join_request",
+  "reject_join_request",
+];
 
-    if (adminOnlyActions.includes(action) && !isAdmin) {
-      return NextResponse.json(
-        { success: false, error: "Only admins can do this" },
-        { status: 403 }
-      );
-    }
+if (adminOnlyActions.includes(action) && !isAdmin) {
+  return NextResponse.json(
+    { success: false, error: "Only admins can do this" },
+    { status: 403 }
+  );
+}
+
+const canAddMembers =
+  isAdmin || group.memberPermission === "all";
+
+if (
+  ["add_member", "add_members"].includes(action) &&
+  !canAddMembers
+) {
+  return NextResponse.json(
+    { success: false, error: "Only admins can add people" },
+    { status: 403 }
+  );
+}
 
     if (action === "add_members") {
       if (!targetUserIds.length) {

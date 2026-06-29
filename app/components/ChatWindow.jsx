@@ -1,420 +1,251 @@
-  "use client";
+"use client";
 
-  import { useEffect, useLayoutEffect, useRef, useState } from "react";
-  import { useRouter, useSearchParams } from "next/navigation";
-  import {
-    FaArrowLeft,
-    FaPhoneAlt,
-    FaVideo,
-    FaCommentDots,
-    FaPhoneSlash,
-    FaPhoneVolume,
-  } from "react-icons/fa";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  FaArrowLeft,
+  FaPhoneAlt,
+  FaVideo,
+  FaCommentDots,
+  FaPhoneSlash,
+  FaPhoneVolume,
+} from "react-icons/fa";
 
-  import Composer from "./Composer";
-  import MessageBubble from "./MessageBubble";
-  import { ChatAvatar } from "./Avatar";
+import Composer from "./Composer";
+import MessageBubble from "./MessageBubble";
+import { ChatAvatar } from "./Avatar";
 
-  export default function ChatWindow({
-    currentUser,
-    conversation,
-    onRefreshConversations,
-    onBack,
-  }) {
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const conversationIdFromUrl = searchParams.get("conversationId");
+export default function ChatWindow({
+  currentUser,
+  conversation,
+  onRefreshConversations,
+  onBack,
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const conversationIdFromUrl = searchParams.get("conversationId");
 
-    const chatBodyRef = useRef(null);
-    const messageListRef = useRef(null);
-    const loadedConversationRef = useRef(null);
-    const fetchingMessagesRef = useRef(false);
-    const pendingMessagesRef = useRef([]);
-    const bottomLockTimerRef = useRef(null);
+  const chatBodyRef = useRef(null);
+  const messageListRef = useRef(null);
+  const loadedConversationRef = useRef(null);
+  const fetchingMessagesRef = useRef(false);
+  const pendingMessagesRef = useRef([]);
+  const bottomLockTimerRef = useRef(null);
 
-    const [activeConversation, setActiveConversation] = useState(
-      conversation || null,
-    );
-    const [isHydratingConversation, setIsHydratingConversation] = useState(false);
-    const [messages, setMessages] = useState([]);
-    const [chatCalls, setChatCalls] = useState([]);
-    const [initialChatLoading, setInitialChatLoading] = useState(false);
-    const [showRealChat, setShowRealChat] = useState(false);
-    const [isPreparingReveal, setIsPreparingReveal] = useState(false);
-    const [previewImage, setPreviewImage] = useState(null);
-    const [localBlockedUsers, setLocalBlockedUsers] = useState([]);
+  const [activeConversation, setActiveConversation] = useState(
+    conversation || null,
+  );
+  const [isHydratingConversation, setIsHydratingConversation] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [chatCalls, setChatCalls] = useState([]);
+  const [initialChatLoading, setInitialChatLoading] = useState(false);
+  const [showRealChat, setShowRealChat] = useState(false);
+  const [isPreparingReveal, setIsPreparingReveal] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [localBlockedUsers, setLocalBlockedUsers] = useState([]);
 
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-    const authHeaders = {
-      Authorization: token ? `Bearer ${token}` : "",
-    };
+  const authHeaders = {
+    Authorization: token ? `Bearer ${token}` : "",
+  };
 
-    useEffect(() => {
-      if (conversation?._id) {
-        setActiveConversation(conversation);
-      }
-    }, [conversation?._id]);
+  useEffect(() => {
+    if (conversation?._id) {
+      setActiveConversation(conversation);
+    }
+  }, [conversation?._id]);
 
-    useEffect(() => {
-      if (!conversationIdFromUrl) {
-        setActiveConversation(null);
-        setMessages([]);
-        setChatCalls([]);
-        setShowRealChat(false);
-        setIsPreparingReveal(false);
-        loadedConversationRef.current = null;
-        pendingMessagesRef.current = [];
-        return;
-      }
-
-      if (!currentUser?._id) return;
-      if (activeConversation?._id === conversationIdFromUrl) return;
-
-      let cancelled = false;
-
-      async function hydrateConversation() {
-        try {
-          setIsHydratingConversation(true);
-          setShowRealChat(false);
-          setIsPreparingReveal(false);
-
-          const res = await fetch(
-            `/api/conversations?userId=${currentUser._id}`,
-            { headers: authHeaders },
-          );
-
-          if (!res.ok || cancelled) return;
-
-          const result = await res.json();
-
-          const found = result?.conversations?.find(
-            (item) => item?._id === conversationIdFromUrl,
-          );
-
-          if (found && !cancelled) {
-            setActiveConversation(found);
-          }
-        } catch (error) {
-          console.error("Hydrate conversation error:", error);
-        } finally {
-          if (!cancelled) setIsHydratingConversation(false);
-        }
-      }
-
-      hydrateConversation();
-
-      return () => {
-        cancelled = true;
-      };
-    }, [conversationIdFromUrl, currentUser?._id]);
-
-    useEffect(() => {
-      if (!activeConversation?._id || !currentUser?._id) return;
-
-      const isNewConversation =
-        loadedConversationRef.current !== activeConversation._id;
-
-      if (!isNewConversation) return;
-
-      loadedConversationRef.current = activeConversation._id;
-      pendingMessagesRef.current = [];
-
+  useEffect(() => {
+    if (!conversationIdFromUrl) {
+      setActiveConversation(null);
       setMessages([]);
+      setChatCalls([]);
       setShowRealChat(false);
       setIsPreparingReveal(false);
-      setInitialChatLoading(true);
+      loadedConversationRef.current = null;
+      pendingMessagesRef.current = [];
+      return;
+    }
 
-      fetchMessages(true);
-      fetchChatCalls();
-    }, [activeConversation?._id, currentUser?._id]);
+    if (!currentUser?._id) return;
+    if (activeConversation?._id === conversationIdFromUrl) return;
 
-    useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateConversation() {
+      try {
+        setIsHydratingConversation(true);
+        setShowRealChat(false);
+        setIsPreparingReveal(false);
+
+        const res = await fetch(
+          `/api/conversations?userId=${currentUser._id}`,
+          { headers: authHeaders },
+        );
+
+        if (!res.ok || cancelled) return;
+
+        const result = await res.json();
+
+        const found = result?.conversations?.find(
+          (item) => item?._id === conversationIdFromUrl,
+        );
+
+        if (found && !cancelled) {
+          setActiveConversation(found);
+        }
+      } catch (error) {
+        console.error("Hydrate conversation error:", error);
+      } finally {
+        if (!cancelled) setIsHydratingConversation(false);
+      }
+    }
+
+    hydrateConversation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationIdFromUrl, currentUser?._id]);
+
+  useEffect(() => {
+    if (!activeConversation?._id || !currentUser?._id) return;
+
+    const isNewConversation =
+      loadedConversationRef.current !== activeConversation._id;
+
+    if (!isNewConversation) return;
+
+    loadedConversationRef.current = activeConversation._id;
+    pendingMessagesRef.current = [];
+
+    setMessages([]);
+    setShowRealChat(false);
+    setIsPreparingReveal(false);
+    setInitialChatLoading(true);
+
+    fetchMessages(true);
+    fetchChatCalls();
+  }, [activeConversation?._id, currentUser?._id]);
+
+  useEffect(() => {
     setLocalBlockedUsers(currentUser?.blockedUsers || []);
   }, [currentUser?.blockedUsers]);
 
-    useEffect(() => {
-      if (!activeConversation?._id || !currentUser?._id) return;
+  async function refreshActiveConversation() {
+    if (!activeConversation?._id || !currentUser?._id) return;
 
-      const interval = setInterval(() => {
-        fetchMessages(false);
-      }, 2000);
+    try {
+      const res = await fetch(`/api/conversations?userId=${currentUser._id}`, {
+        headers: authHeaders,
+      });
 
-      return () => clearInterval(interval);
-    }, [activeConversation?._id, currentUser?._id]);
+      const result = await res.json().catch(() => null);
 
-    async function fetchMessages(initialLoad = false) {
-      if (fetchingMessagesRef.current) return;
-      if (!activeConversation?._id || !currentUser?._id) return;
+      if (!res.ok || !result?.success) return;
 
-      const conversationId = activeConversation._id;
+      const updatedConversation = result?.conversations?.find(
+        (item) => item?._id === activeConversation._id,
+      );
 
-      try {
-        fetchingMessagesRef.current = true;
+      if (updatedConversation) {
+        setActiveConversation(updatedConversation);
+      }
+    } catch (error) {
+      console.error("Refresh active conversation error:", error);
+    }
+  }
 
-        const res = await fetch(
-          `/api/messages?conversationId=${conversationId}&userId=${currentUser._id}`,
-          { headers: authHeaders },
-        );
+  async function fetchMessages(initialLoad = false) {
+    if (fetchingMessagesRef.current) return;
+    if (!activeConversation?._id || !currentUser?._id) return;
 
-        const result = await res.json().catch(() => null);
+    const conversationId = activeConversation._id;
 
-        // IMPORTANT: do not clear old messages if API failed
-        if (!res.ok || !result?.success) {
-          console.error("Fetch messages failed:", result?.error);
-          return;
-        }
+    try {
+      fetchingMessagesRef.current = true;
 
-        const nextMessages = result?.messages || [];
-        markActiveChatAsRead();
+      const res = await fetch(
+        `/api/messages?conversationId=${conversationId}&userId=${currentUser._id}`,
+        { headers: authHeaders },
+      );
 
-        if (loadedConversationRef.current !== conversationId) return;
+      const result = await res.json().catch(() => null);
 
-        if (initialLoad) {
-          pendingMessagesRef.current = nextMessages;
-        } else {
-          setMessages(nextMessages);
-          requestAnimationFrame(() => scrollToBottomHard());
-        }
-      } catch (error) {
-        console.error("Fetch messages error:", error);
-      } finally {
-        fetchingMessagesRef.current = false;
+      // IMPORTANT: do not clear old messages if API failed
+      if (!res.ok || !result?.success) {
+        console.error("Fetch messages failed:", result?.error);
+        return;
+      }
 
-        if (initialLoad && loadedConversationRef.current === conversationId) {
-          setTimeout(() => {
-            setMessages(pendingMessagesRef.current);
-            setInitialChatLoading(false);
-            setIsPreparingReveal(true);
-          }, 180);
-        }
+      const nextMessages = result?.messages || [];
+      markActiveChatAsRead();
+
+      if (loadedConversationRef.current !== conversationId) return;
+
+      if (initialLoad) {
+        pendingMessagesRef.current = nextMessages;
+      } else {
+        setMessages(nextMessages);
+        requestAnimationFrame(() => scrollToBottomHard());
+      }
+    } catch (error) {
+      console.error("Fetch messages error:", error);
+    } finally {
+      fetchingMessagesRef.current = false;
+
+      if (initialLoad && loadedConversationRef.current === conversationId) {
+        setTimeout(() => {
+          setMessages(pendingMessagesRef.current);
+          setInitialChatLoading(false);
+          setIsPreparingReveal(true);
+        }, 180);
       }
     }
+  }
 
-    const otherPerson = activeConversation?.members?.find(
-      (member) => member?._id !== currentUser?._id,
-    );
+  const otherPerson = activeConversation?.members?.find(
+    (member) => member?._id !== currentUser?._id,
+  );
 
   const isBlockedByMe =
     localBlockedUsers?.some?.(
-      (id) => id?.toString() === otherPerson?._id?.toString()
+      (id) => id?.toString() === otherPerson?._id?.toString(),
     ) || false;
-
 
   const isBlockedByOther =
     otherPerson?.blockedUsers?.some?.(
-      (id) => id?.toString() === currentUser?._id?.toString()
+      (id) => id?.toString() === currentUser?._id?.toString(),
     ) || false;
 
-const isDirectChat = activeConversation?.type !== "group";
+  const isDirectChat = activeConversation?.type !== "group";
 
-const isChatRestricted =
-  isDirectChat && (isBlockedByMe || isBlockedByOther);
-  
-    async function fetchChatCalls() {
-      if (!activeConversation?._id || !currentUser?._id) return;
+  const isChatRestricted = isDirectChat && (isBlockedByMe || isBlockedByOther);
 
-      try {
-        const res = await fetch(
-          `/api/calls?userId=${currentUser._id}&conversationId=${activeConversation._id}`,
-          { headers: authHeaders },
-        );
+  async function fetchChatCalls() {
+    if (!activeConversation?._id || !currentUser?._id) return;
 
-        const result = await res.json();
-        setChatCalls(result?.calls || []);
-      } catch (error) {
-        console.error("Fetch chat calls error:", error);
-        setChatCalls([]);
-      }
-    }
-
-    async function markActiveChatAsRead() {
-      if (!activeConversation?._id || !currentUser?._id) return;
-
-      try {
-        await fetch("/api/messages/read", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...authHeaders,
-          },
-          body: JSON.stringify({
-            conversationId: activeConversation._id,
-            userId: currentUser._id,
-          }),
-        });
-
-        onRefreshConversations?.();
-      } catch (error) {
-        console.error("Mark read error:", error);
-      }
-    }
-
-    useLayoutEffect(() => {
-      if (!isPreparingReveal) return;
-
-      if (messages.length === 0) {
-        setIsPreparingReveal(false);
-        setShowRealChat(true);
-        return;
-      }
-
-      requestAnimationFrame(() => {
-        scrollToBottomHard();
-
-        requestAnimationFrame(() => {
-          scrollToBottomHard();
-
-          setShowRealChat(true);
-          setIsPreparingReveal(false);
-
-          lockBottomForAWhile();
-        });
-      });
-    }, [isPreparingReveal, messages.length]);
-
-    useEffect(() => {
-      if (!showRealChat) return;
-      if (!chatBodyRef.current) return;
-
-      const body = chatBodyRef.current;
-
-      const observer = new ResizeObserver(() => {
-        scrollToBottomHard();
-      });
-
-      observer.observe(body);
-
-      if (messageListRef.current) {
-        observer.observe(messageListRef.current);
-      }
-
-      return () => observer.disconnect();
-    }, [showRealChat, activeConversation?._id]);
-
-    function lockBottomForAWhile() {
-      if (bottomLockTimerRef.current) {
-        clearInterval(bottomLockTimerRef.current);
-      }
-
-      const start = Date.now();
-
-      bottomLockTimerRef.current = setInterval(() => {
-        scrollToBottomHard();
-
-        if (Date.now() - start > 1200) {
-          clearInterval(bottomLockTimerRef.current);
-          bottomLockTimerRef.current = null;
-        }
-      }, 80);
-    }
-
-    function scrollToBottomHard() {
-      const body = chatBodyRef.current;
-      if (!body) return;
-
-      body.scrollTop = body.scrollHeight;
-    }
-
-    async function sendMessage(payload = {}) {
-      const token = localStorage.getItem("token");
-
-      try {
-        if (!activeConversation?._id) {
-          alert("Select chat first");
-          return;
-        }
-
-        if (!currentUser?._id) {
-          alert("Login again");
-          return;
-        }
-
-        const messagePayload = {
-          conversationId: activeConversation._id,
-          senderId: currentUser._id,
-          text: payload?.text || "",
-          attachments: payload?.attachments || [],
-          location: payload?.location || null,
-        };
-
-        const res = await fetch("/api/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-          body: JSON.stringify(messagePayload),
-        });
-
-        if (res.status === 401) {
-          localStorage.clear();
-          localStorage.setItem(
-            "sessionMessage",
-            "Your session has expired. Please login again.",
-          );
-          router.push("/auth/login");
-          return;
-        }
-
-        const result = await res.json().catch(() => null);
-
-        if (!res.ok || !result?.success) {
-          alert(result?.error || "Message send failed");
-          return;
-        }
-
-        setMessages((prev) => [...prev, result.message]);
-        setTimeout(() => {
-          fetchMessages(false);
-          fetchChatCalls();
-        }, 100);
-
-        setShowRealChat(true);
-        onRefreshConversations?.();
-
-        setTimeout(() => {
-          scrollToBottomHard();
-          lockBottomForAWhile();
-        }, 30);
-      } catch (error) {
-        console.error("Send message error:", error);
-        alert("Message send failed");
-      }
-    }
-
-    async function deleteMessage(messageId, type = "me") {
-      const ok = confirm(
-        type === "everyone"
-          ? "Delete this message for everyone?"
-          : "Delete this message for me?",
-      );
-
-      if (!ok) return;
-
+    try {
       const res = await fetch(
-        `/api/messages/${messageId}?userId=${currentUser?._id}&type=${type}`,
-        {
-          method: "DELETE",
-          headers: authHeaders,
-        },
+        `/api/calls?userId=${currentUser._id}&conversationId=${activeConversation._id}`,
+        { headers: authHeaders },
       );
 
       const result = await res.json();
-
-      if (result?.success) {
-        fetchMessages(false);
-      }
+      setChatCalls(result?.calls || []);
+    } catch (error) {
+      console.error("Fetch chat calls error:", error);
+      setChatCalls([]);
     }
+  }
 
-    async function startCall(type) {
-      if (!activeConversation?._id) {
-        alert("Select chat first");
-        return;
-      }
+  async function markActiveChatAsRead() {
+    if (!activeConversation?._id || !currentUser?._id) return;
 
-      const res = await fetch("/api/calls", {
+    try {
+      await fetch("/api/messages/read", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -422,199 +253,408 @@ const isChatRestricted =
         },
         body: JSON.stringify({
           conversationId: activeConversation._id,
-          callerId: currentUser?._id,
-          type,
+          userId: currentUser._id,
         }),
       });
+
+      onRefreshConversations?.();
+    } catch (error) {
+      console.error("Mark read error:", error);
+    }
+  }
+
+  useLayoutEffect(() => {
+    if (!isPreparingReveal) return;
+
+    if (messages.length === 0) {
+      setIsPreparingReveal(false);
+      setShowRealChat(true);
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      scrollToBottomHard();
+
+      requestAnimationFrame(() => {
+        scrollToBottomHard();
+
+        setShowRealChat(true);
+        setIsPreparingReveal(false);
+
+        lockBottomForAWhile();
+      });
+    });
+  }, [isPreparingReveal, messages.length]);
+
+  useEffect(() => {
+    if (!showRealChat) return;
+    if (!chatBodyRef.current) return;
+
+    const body = chatBodyRef.current;
+
+    const observer = new ResizeObserver(() => {
+      scrollToBottomHard();
+    });
+
+    observer.observe(body);
+
+    if (messageListRef.current) {
+      observer.observe(messageListRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [showRealChat, activeConversation?._id]);
+
+  function lockBottomForAWhile() {
+    if (bottomLockTimerRef.current) {
+      clearInterval(bottomLockTimerRef.current);
+    }
+
+    const start = Date.now();
+
+    bottomLockTimerRef.current = setInterval(() => {
+      scrollToBottomHard();
+
+      if (Date.now() - start > 1200) {
+        clearInterval(bottomLockTimerRef.current);
+        bottomLockTimerRef.current = null;
+      }
+    }, 80);
+  }
+
+  function scrollToBottomHard() {
+    const body = chatBodyRef.current;
+    if (!body) return;
+
+    body.scrollTop = body.scrollHeight;
+  }
+
+  async function sendMessage(payload = {}) {
+    const token = localStorage.getItem("token");
+
+    try {
+      if (!activeConversation?._id) {
+        alert("Select chat first");
+        return;
+      }
+
+      if (!currentUser?._id) {
+        alert("Login again");
+        return;
+      }
+
+      const messagePayload = {
+        conversationId: activeConversation._id,
+        senderId: currentUser._id,
+        text: payload?.text || "",
+        attachments: payload?.attachments || [],
+        location: payload?.location || null,
+      };
+
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify(messagePayload),
+      });
+
+      if (res.status === 401) {
+        localStorage.clear();
+        localStorage.setItem(
+          "sessionMessage",
+          "Your session has expired. Please login again.",
+        );
+        router.push("/auth/login");
+        return;
+      }
 
       const result = await res.json().catch(() => null);
 
       if (!res.ok || !result?.success) {
-        alert(result?.error || "Call create failed.");
+        alert(result?.error || "Message send failed");
         return;
       }
 
-      router.push(
-        `/call?room=${activeConversation._id}&type=${type}&callId=${result?.call?._id}`,
-      );
+      setMessages((prev) => [...prev, result.message]);
+      setTimeout(() => {
+        fetchMessages(false);
+        fetchChatCalls();
+      }, 100);
+
+      setShowRealChat(true);
+      onRefreshConversations?.();
+
+      setTimeout(() => {
+        scrollToBottomHard();
+        lockBottomForAWhile();
+      }, 30);
+    } catch (error) {
+      console.error("Send message error:", error);
+      alert("Message send failed");
+    }
+  }
+
+  useEffect(() => {
+    if (!activeConversation?._id || !currentUser?._id) return;
+
+    refreshActiveConversation();
+
+    const interval = setInterval(() => {
+      refreshActiveConversation();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activeConversation?._id, currentUser?._id]);
+
+  useEffect(() => {
+  if (!activeConversation?._id || !currentUser?._id) return;
+
+  const interval = setInterval(() => {
+    fetchMessages(false);
+  }, 2000);
+
+  return () => clearInterval(interval);
+}, [activeConversation?._id, currentUser?._id]);
+
+
+  async function deleteMessage(messageId, type = "me") {
+    const ok = confirm(
+      type === "everyone"
+        ? "Delete this message for everyone?"
+        : "Delete this message for me?",
+    );
+
+    if (!ok) return;
+
+    const res = await fetch(
+      `/api/messages/${messageId}?userId=${currentUser?._id}&type=${type}`,
+      {
+        method: "DELETE",
+        headers: authHeaders,
+      },
+    );
+
+    const result = await res.json();
+
+    if (result?.success) {
+      fetchMessages(false);
+    }
+  }
+
+  async function startCall(type) {
+    if (!activeConversation?._id) {
+      alert("Select chat first");
+      return;
     }
 
-    async function sendQuickMessage(text) {
-      await sendMessage({
-        text,
-        attachments: [],
-        location: null,
-      });
+    const res = await fetch("/api/calls", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+      body: JSON.stringify({
+        conversationId: activeConversation._id,
+        callerId: currentUser?._id,
+        type,
+      }),
+    });
+
+    const result = await res.json().catch(() => null);
+
+    if (!res.ok || !result?.success) {
+      alert(result?.error || "Call create failed.");
+      return;
     }
 
-    function getChatTitle() {
-      if (activeConversation?.type === "group") {
-        return activeConversation?.name || "Group";
-      }
+    router.push(
+      `/call?room=${activeConversation._id}&type=${type}&callId=${result?.call?._id}`,
+    );
+  }
 
-      const receiver = activeConversation?.members?.find(
-        (member) => member?._id !== currentUser?._id,
-      );
+  async function sendQuickMessage(text) {
+    await sendMessage({
+      text,
+      attachments: [],
+      location: null,
+    });
+  }
 
-      return receiver?.name || "User";
+  function getChatTitle() {
+    if (activeConversation?.type === "group") {
+      return activeConversation?.name || "Group";
     }
 
-    const chatTimeline = [
-      ...messages.map((item) => ({
-        type: "message",
-        createdAt: item?.createdAt,
-        data: item,
-      })),
-      ...chatCalls.map((item) => ({
-        type: "call",
-        createdAt: item?.createdAt,
-        data: item,
-      })),
-    ].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const receiver = activeConversation?.members?.find(
+      (member) => member?._id !== currentUser?._id,
+    );
 
-    const loadingChat =
-      isHydratingConversation ||
-      initialChatLoading ||
-      isPreparingReveal ||
-      !showRealChat;
+    return receiver?.name || "User";
+  }
 
-    function renderHeader() {
-      return (
-        <header className="chat-header d-flex align-items-center justify-content-between px-2 px-sm-3">
-          <div
-            className="d-flex align-items-center min-w-0 flex-grow-1"
-            role="button"
-            tabIndex={0}
-            
+  const chatTimeline = [
+    ...messages.map((item) => ({
+      type: "message",
+      createdAt: item?.createdAt,
+      data: item,
+    })),
+    ...chatCalls.map((item) => ({
+      type: "call",
+      createdAt: item?.createdAt,
+      data: item,
+    })),
+  ].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  const loadingChat =
+    isHydratingConversation ||
+    initialChatLoading ||
+    isPreparingReveal ||
+    !showRealChat;
+
+  function renderHeader() {
+    return (
+      <header className="chat-header d-flex align-items-center justify-content-between px-2 px-sm-3">
+        <div
+          className="d-flex align-items-center min-w-0 flex-grow-1"
+          role="button"
+          tabIndex={0}
+        >
+          <button
+            type="button"
+            onClick={onBack}
+            className="btn btn-sm rounded-circle d-md-none me-2"
+            title="Back"
           >
-            <button
-              type="button"
-              onClick={onBack}
-              className="btn btn-sm rounded-circle d-md-none me-2"
-              title="Back"
-            >
-              <FaArrowLeft />
-            </button>
+            <FaArrowLeft />
+          </button>
 
-            {activeConversation?._id && showRealChat ? (
-              isChatRestricted ? (
-                <div className="blocked-avatar">
-                  <span className="blocked-icon">🚫</span>
-                </div>
-              ) : (
-                <div onClick={() => {
-              if (activeConversation?._id) {
-                router.push(
-                  `/chat/info?conversationId=${activeConversation._id}`,
-                );
-              }
-            }}>
+          {activeConversation?._id && showRealChat ? (
+            isChatRestricted ? (
+              <div className="blocked-avatar">
+                <span className="blocked-icon">🚫</span>
+              </div>
+            ) : (
+              <div
+                onClick={() => {
+                  if (activeConversation?._id) {
+                    router.push(
+                      `/chat/info?conversationId=${activeConversation._id}`,
+                    );
+                  }
+                }}
+              >
                 <ChatAvatar
                   conversation={activeConversation}
                   currentUser={currentUser}
                   size={44}
                 />
+              </div>
+            )
+          ) : (
+            <HeaderAvatarSkeleton />
+          )}
+
+          <div className="ms-2 ms-sm-3 min-w-0">
+            {activeConversation?._id && showRealChat ? (
+              isChatRestricted ? (
+                <>
+                  <h6 className="mb-0 text-dark fw-bold">Blocked Contact</h6>
+
+                  <small className="text-danger">
+                    {isBlockedByMe
+                      ? "You blocked this contact"
+                      : "This contact blocked you"}
+                  </small>
+                </>
+              ) : (
+                <div
+                  onClick={() => {
+                    if (activeConversation?._id) {
+                      router.push(
+                        `/chat/info?conversationId=${activeConversation._id}`,
+                      );
+                    }
+                  }}
+                >
+                  <h6 className="mb-0 text-dark fw-bold text-truncate">
+                    {getChatTitle()}
+                  </h6>
+
+                  <small className="text-secondary">
+                    {activeConversation?.type === "group"
+                      ? "Group chat"
+                      : "Private chat"}
+                  </small>
                 </div>
               )
             ) : (
-              <HeaderAvatarSkeleton />
+              <HeaderTextSkeleton />
             )}
-
-            <div className="ms-2 ms-sm-3 min-w-0">
-              {activeConversation?._id && showRealChat ? (
-                isChatRestricted ? (
-                  <>
-                    <h6 className="mb-0 text-dark fw-bold">Blocked Contact</h6>
-
-                    <small className="text-danger">
-                      You blocked this contact
-                    </small>
-                  </>
-                ) : (
-                  <div onClick={() => {
-              if (activeConversation?._id) {
-                router.push(
-                  `/chat/info?conversationId=${activeConversation._id}`,
-                );
-              }
-            }}>
-                    <h6 className="mb-0 text-dark fw-bold text-truncate">
-                      {getChatTitle()}
-                    </h6>
-
-                    <small className="text-secondary">
-                      {activeConversation?.type === "group"
-                        ? "Group chat"
-                        : "Private chat"}
-                    </small>
-                  </div>
-                )
-              ) : (
-                <HeaderTextSkeleton />
-              )}
-            </div>
           </div>
+        </div>
 
-          {activeConversation?._id && showRealChat && !isChatRestricted && (
-            <div className="d-flex align-items-center gap-1 gap-sm-2">
-              <button
-                type="button"
-                onClick={() => startCall("audio")}
-                className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
-                style={{
-                  background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
-                }}
-              >
-                <FaPhoneAlt />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => startCall("video")}
-                className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
-                style={{
-                  background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
-                }}
-              >
-                <FaVideo />
-              </button>
-            </div>
-          )}
-        </header>
-      );
-    }
-
-    if (
-      !conversationIdFromUrl &&
-      !activeConversation?._id &&
-      !isHydratingConversation
-    ) {
-      return (
-        <main className="chat-window-shell d-none d-md-flex align-items-center justify-content-center">
-          <div className="text-center px-4">
-            <div
-              className="mx-auto mb-3 rounded-circle d-flex align-items-center justify-content-center text-white"
+        {activeConversation?._id && showRealChat && !isChatRestricted && (
+          <div className="d-flex align-items-center gap-1 gap-sm-2">
+            <button
+              type="button"
+              onClick={() => startCall("audio")}
+              className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
               style={{
-                width: 90,
-                height: 90,
                 background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
               }}
             >
-              💬
-            </div>
+              <FaPhoneAlt />
+            </button>
 
-            <h1 className="fw-bold text-dark">ChatterBox Pro Max</h1>
-            <p className="text-secondary mt-3">
-              Select a chat, search your network, or create a group.
-            </p>
+            <button
+              type="button"
+              onClick={() => startCall("video")}
+              className="btn btn-sm rounded-circle chat-icon-btn text-white border-0"
+              style={{
+                background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
+              }}
+            >
+              <FaVideo />
+            </button>
           </div>
-        </main>
-      );
-    }
+        )}
+      </header>
+    );
+  }
 
+  if (
+    !conversationIdFromUrl &&
+    !activeConversation?._id &&
+    !isHydratingConversation
+  ) {
     return (
-      <main className="chat-window-shell d-flex flex-column">
-        <style>{`
+      <main className="chat-window-shell d-none d-md-flex align-items-center justify-content-center">
+        <div className="text-center px-4">
+          <div
+            className="mx-auto mb-3 rounded-circle d-flex align-items-center justify-content-center text-white"
+            style={{
+              width: 90,
+              height: 90,
+              background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
+            }}
+          >
+            💬
+          </div>
+
+          <h1 className="fw-bold text-dark">ChatterBox Pro Max</h1>
+          <p className="text-secondary mt-3">
+            Select a chat, search your network, or create a group.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="chat-window-shell d-flex flex-column">
+      <style>{`
           .chat-body {
             position: relative;
             overflow-anchor: none;
@@ -718,333 +758,335 @@ const isChatRestricted =
           }
         `}</style>
 
-        {renderHeader()}
+      {renderHeader()}
 
-        <section
-          ref={chatBodyRef}
-          className="chat-body flex-grow-1 min-h-0 overflow-auto"
-        >
+      <section
+        ref={chatBodyRef}
+        className="chat-body flex-grow-1 min-h-0 overflow-auto"
+      >
         {!isChatRestricted && chatTimeline.length > 0 && (
-            <div
-              ref={messageListRef}
-              className={`real-message-layer chat-message-list chat-message-enter ${
-                !showRealChat ? "hidden-before-reveal" : ""
-              }`}
-            >
-              {chatTimeline.map((item) =>
-                item.type === "call" ? (
-                  <CallChatEvent
-                    key={`call-${item.data?._id}`}
-                    call={item.data}
-                    currentUser={currentUser}
-                  />
-                ) : (
-                  <MessageBubble
-                    key={item.data?._id}
-                    message={item.data}
-                    isOwnMessage={item.data?.sender?._id === currentUser?._id}
-                    onDeleteMessage={deleteMessage}
-                    onPreviewImage={setPreviewImage}
-                  />
-                ),
-              )}
-            </div>
-          )}
-
-          {isChatRestricted && (
-  <BlockedComposer
-    currentUser={currentUser}
-    otherPerson={otherPerson}
-    isBlockedByMe={isBlockedByMe}
-    isBlockedByOther={isBlockedByOther}
-    onUnblock={async () => {
-        const token = localStorage.getItem("token");
-
-        const res = await fetch(
-          `/api/users/block?userId=${currentUser._id}&targetUserId=${otherPerson._id}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: token ? `Bearer ${token}` : "",
-            },
-          }
-        );
-
-        const result = await res.json();
-
-        if (result?.success) {
-          const updatedBlockedUsers = localBlockedUsers.filter(
-            (id) => id?.toString() !== otherPerson?._id?.toString()
-          );
-
-          setLocalBlockedUsers(updatedBlockedUsers);
-
-          const oldUser = JSON.parse(localStorage.getItem("user") || "null");
-          localStorage.setItem(
-            "user",
-            JSON.stringify({
-              ...oldUser,
-              blockedUsers: updatedBlockedUsers,
-            })
-          );
-
-          onRefreshConversations?.();
-          fetchMessages(false);
-          fetchChatCalls();
-        }
-      }}
-    />
-  )}
-
-        {showRealChat &&
-  !isChatRestricted &&
-  chatTimeline.length === 0 && (
-            <EmptyChat onQuickMessage={sendQuickMessage} title={getChatTitle()} />
-          )}
-
-          {loadingChat && (
-            <div className="chat-loading-cover">
-              <PremiumChatSkeleton />
-            </div>
-          )}
-        </section>
-
-      {activeConversation?._id && !isChatRestricted && (
-    <div
-      className={`chat-composer-wrap ${
-        !showRealChat ? "composer-hidden-but-space" : ""
-      }`}
-    >
-      <Composer onSend={sendMessage} currentUser={currentUser} />
-    </div>
-  )}
-
-        {previewImage && (
           <div
-            className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-100 d-flex align-items-center justify-content-center"
-            style={{ zIndex: 99999 }}
-            onClick={() => setPreviewImage(null)}
+            ref={messageListRef}
+            className={`real-message-layer chat-message-list chat-message-enter ${
+              !showRealChat ? "hidden-before-reveal" : ""
+            }`}
           >
-            <button
-              className="btn btn-danger position-absolute top-0 end-0 m-3"
-              onClick={() => setPreviewImage(null)}
-            >
-              ✕
-            </button>
-
-            <img
-              src={previewImage}
-              alt="preview"
-              style={{
-                maxWidth: "95%",
-                maxHeight: "95%",
-                objectFit: "contain",
-              }}
-              onClick={(e) => e.stopPropagation()}
-            />
+            {chatTimeline.map((item) =>
+              item.type === "call" ? (
+                <CallChatEvent
+                  key={`call-${item.data?._id}`}
+                  call={item.data}
+                  currentUser={currentUser}
+                />
+              ) : (
+                <MessageBubble
+                  key={item.data?._id}
+                  message={item.data}
+                  isOwnMessage={item.data?.sender?._id === currentUser?._id}
+                  onDeleteMessage={deleteMessage}
+                  onPreviewImage={setPreviewImage}
+                />
+              ),
+            )}
           </div>
         )}
-      </main>
-    );
-  }
 
-  function BlockedComposer({
-    otherPerson,
-    isBlockedByMe,
-    isBlockedByOther,
-    onUnblock,
-  }) {
-    return (
-      <div className="h-100 d-flex align-items-center justify-content-center px-3">
-        <div className="blocked-card mx-auto">
-          <div className="blocked-big-icon">🚫</div>
+        {isChatRestricted && (
+          <BlockedComposer
+            currentUser={currentUser}
+            otherPerson={otherPerson}
+            isBlockedByMe={isBlockedByMe}
+            isBlockedByOther={isBlockedByOther}
+            onUnblock={async () => {
+              const token = localStorage.getItem("token");
 
-          <div className="fw-bold text-dark mb-1">
-            {isBlockedByMe
-              ? `You blocked ${otherPerson?.name || "this contact"}`
-              : "You can't message this contact"}
+              const res = await fetch(
+                `/api/users/block?userId=${currentUser._id}&targetUserId=${otherPerson._id}`,
+                {
+                  method: "DELETE",
+                  headers: {
+                    Authorization: token ? `Bearer ${token}` : "",
+                  },
+                },
+              );
+
+              const result = await res.json();
+
+              if (result?.success) {
+                const updatedBlockedUsers = localBlockedUsers.filter(
+                  (id) => id?.toString() !== otherPerson?._id?.toString(),
+                );
+
+                setLocalBlockedUsers(updatedBlockedUsers);
+
+                const oldUser = JSON.parse(
+                  localStorage.getItem("user") || "null",
+                );
+                localStorage.setItem(
+                  "user",
+                  JSON.stringify({
+                    ...oldUser,
+                    blockedUsers: updatedBlockedUsers,
+                  }),
+                );
+
+                onRefreshConversations?.();
+                fetchMessages(false);
+                fetchChatCalls();
+
+                refreshActiveConversation();
+              }
+            }}
+          />
+        )}
+
+        {showRealChat && !isChatRestricted && chatTimeline.length === 0 && (
+          <EmptyChat onQuickMessage={sendQuickMessage} title={getChatTitle()} />
+        )}
+
+        {loadingChat && (
+          <div className="chat-loading-cover">
+            <PremiumChatSkeleton />
           </div>
+        )}
+      </section>
 
-          <div className="text-secondary small mb-3">
-            {isBlockedByMe
-              ? "Messages, calls, media and profile details are hidden until you unblock."
-              : "Messages and calls are unavailable right now."}
-          </div>
+      {activeConversation?._id && !isChatRestricted && (
+        <div
+          className={`chat-composer-wrap ${
+            !showRealChat ? "composer-hidden-but-space" : ""
+          }`}
+        >
+          <Composer onSend={sendMessage} currentUser={currentUser} />
+        </div>
+      )}
+
+      {previewImage && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-100 d-flex align-items-center justify-content-center"
+          style={{ zIndex: 99999 }}
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            className="btn btn-danger position-absolute top-0 end-0 m-3"
+            onClick={() => setPreviewImage(null)}
+          >
+            ✕
+          </button>
+
+          <img
+            src={previewImage}
+            alt="preview"
+            style={{
+              maxWidth: "95%",
+              maxHeight: "95%",
+              objectFit: "contain",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </main>
+  );
+}
+
+function BlockedComposer({
+  otherPerson,
+  isBlockedByMe,
+  isBlockedByOther,
+  onUnblock,
+}) {
+  return (
+    <div className="h-100 d-flex align-items-center justify-content-center px-3">
+      <div className="blocked-card mx-auto">
+        <div className="blocked-big-icon">🚫</div>
+
+        <div className="fw-bold text-dark mb-1">
+          {isBlockedByMe
+            ? `You blocked ${otherPerson?.name || "this contact"}`
+            : "You can't message this contact"}
+        </div>
+
+        <div className="text-secondary small mb-3">
+          {isBlockedByMe
+            ? "Messages, calls, media and profile details are hidden until you unblock."
+            : "Messages and calls are unavailable right now."}
+        </div>
 
         {isBlockedByMe && (
-    <button
-      type="button"
-      onClick={onUnblock}
-      className="btn rounded-pill px-4 py-2 fw-bold text-white border-0"
-      style={{
-        background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
-      }}
-    >
-      Unblock contact
-    </button>
-  )}
-        </div>
+          <button
+            type="button"
+            onClick={onUnblock}
+            className="btn rounded-pill px-4 py-2 fw-bold text-white border-0"
+            style={{
+              background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
+            }}
+          >
+            Unblock contact
+          </button>
+        )}
       </div>
-    );
+    </div>
+  );
+}
+
+function CallChatEvent({ call, currentUser }) {
+  const isOutgoing = call?.caller?._id === currentUser?._id;
+  const status = call?.status || "ringing";
+  const callType = call?.type === "video" ? "video" : "audio";
+
+  function formatCallTime(dateValue) {
+    if (!dateValue) return "";
+
+    return new Date(dateValue).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   }
 
-  function CallChatEvent({ call, currentUser }) {
-    const isOutgoing = call?.caller?._id === currentUser?._id;
-    const status = call?.status || "ringing";
-    const callType = call?.type === "video" ? "video" : "audio";
+  const callTime = formatCallTime(call?.createdAt);
 
-    function formatCallTime(dateValue) {
-      if (!dateValue) return "";
-
-      return new Date(dateValue).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+  const getText = () => {
+    if (status === "missed") {
+      return `Missed ${callType} call`;
     }
 
-    const callTime = formatCallTime(call?.createdAt);
+    if (status === "rejected") {
+      return isOutgoing
+        ? `${callType} call declined`
+        : `You declined ${callType} call`;
+    }
 
-    const getText = () => {
-      if (status === "missed") {
-        return `Missed ${callType} call`;
-      }
-
-      if (status === "rejected") {
-        return isOutgoing
-          ? `${callType} call declined`
-          : `You declined ${callType} call`;
-      }
-
-      if (status === "accepted") {
-        return isOutgoing
-          ? `Outgoing ${callType} call`
-          : `Incoming ${callType} call`;
-      }
-
+    if (status === "accepted") {
       return isOutgoing
         ? `Outgoing ${callType} call`
         : `Incoming ${callType} call`;
-    };
+    }
 
-    const Icon =
-      status === "missed" || status === "rejected"
-        ? FaPhoneSlash
-        : status === "accepted"
-          ? FaPhoneVolume
-          : callType === "video"
-            ? FaVideo
-            : FaPhoneAlt;
+    return isOutgoing
+      ? `Outgoing ${callType} call`
+      : `Incoming ${callType} call`;
+  };
 
-    return (
-      <div className="call-chat-event-wrap">
-        <div className={`call-chat-event ${status}`}>
-          <Icon size={11} />
-          <span>{getText()}</span>
+  const Icon =
+    status === "missed" || status === "rejected"
+      ? FaPhoneSlash
+      : status === "accepted"
+        ? FaPhoneVolume
+        : callType === "video"
+          ? FaVideo
+          : FaPhoneAlt;
 
-          {callTime && (
-            <>
-              <span className="call-event-dot">•</span>
-              <span className="call-event-time">{callTime}</span>
-            </>
-          )}
-        </div>
+  return (
+    <div className="call-chat-event-wrap">
+      <div className={`call-chat-event ${status}`}>
+        <Icon size={11} />
+        <span>{getText()}</span>
+
+        {callTime && (
+          <>
+            <span className="call-event-dot">•</span>
+            <span className="call-event-time">{callTime}</span>
+          </>
+        )}
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  function HeaderAvatarSkeleton() {
-    return (
+function HeaderAvatarSkeleton() {
+  return (
+    <div
+      className="rounded-circle flex-shrink-0 skeleton-shimmer header-skeleton"
+      style={{ width: 44, height: 44 }}
+    />
+  );
+}
+
+function HeaderTextSkeleton() {
+  return (
+    <div className="header-skeleton">
       <div
-        className="rounded-circle flex-shrink-0 skeleton-shimmer header-skeleton"
-        style={{ width: 44, height: 44 }}
+        className="rounded skeleton-shimmer mb-2"
+        style={{ width: 140, height: 14 }}
       />
-    );
-  }
+      <div
+        className="rounded skeleton-shimmer"
+        style={{ width: 90, height: 10 }}
+      />
+    </div>
+  );
+}
 
-  function HeaderTextSkeleton() {
-    return (
-      <div className="header-skeleton">
+function PremiumChatSkeleton() {
+  return (
+    <div className="h-100 overflow-hidden p-3 p-sm-4">
+      {[1, 2, 3, 4, 5, 6, 7].map((item) => (
         <div
-          className="rounded skeleton-shimmer mb-2"
-          style={{ width: 140, height: 14 }}
-        />
-        <div
-          className="rounded skeleton-shimmer"
-          style={{ width: 90, height: 10 }}
-        />
-      </div>
-    );
-  }
-
-  function PremiumChatSkeleton() {
-    return (
-      <div className="h-100 overflow-hidden p-3 p-sm-4">
-        {[1, 2, 3, 4, 5, 6, 7].map((item) => (
+          key={item}
+          className={`d-flex mb-4 ${
+            item % 2 === 0 ? "justify-content-end" : ""
+          }`}
+        >
           <div
-            key={item}
-            className={`d-flex mb-4 ${
-              item % 2 === 0 ? "justify-content-end" : ""
-            }`}
-          >
-            <div
-              className="skeleton-shimmer"
-              style={{
-                width: item % 2 === 0 ? "220px" : "280px",
-                maxWidth: "80%",
-                height: item % 3 === 0 ? "90px" : "68px",
-                borderRadius:
-                  item % 2 === 0 ? "22px 22px 6px 22px" : "22px 22px 22px 6px",
-              }}
-            />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  function EmptyChat({ onQuickMessage, title }) {
-    return (
-      <div className="h-100 d-flex align-items-center justify-content-center text-center px-3">
-        <div className="empty-chat-card bg-white shadow-lg border px-4 py-5 rounded-4">
-          <div
-            className="mx-auto mb-4 rounded-circle d-flex align-items-center justify-content-center text-white"
+            className="skeleton-shimmer"
             style={{
-              width: 86,
-              height: 86,
-              background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
-              fontSize: 34,
+              width: item % 2 === 0 ? "220px" : "280px",
+              maxWidth: "80%",
+              height: item % 3 === 0 ? "90px" : "68px",
+              borderRadius:
+                item % 2 === 0 ? "22px 22px 6px 22px" : "22px 22px 22px 6px",
             }}
-          >
-            <FaCommentDots />
-          </div>
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
 
-          <h3 className="text-dark fw-bold mb-2">No Messages Yet</h3>
+function EmptyChat({ onQuickMessage, title }) {
+  return (
+    <div className="h-100 d-flex align-items-center justify-content-center text-center px-3">
+      <div className="empty-chat-card bg-white shadow-lg border px-4 py-5 rounded-4">
+        <div
+          className="mx-auto mb-4 rounded-circle d-flex align-items-center justify-content-center text-white"
+          style={{
+            width: 86,
+            height: 86,
+            background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)",
+            fontSize: 34,
+          }}
+        >
+          <FaCommentDots />
+        </div>
 
-          <p className="text-secondary mb-4 mx-auto" style={{ maxWidth: 360 }}>
-            Start a conversation with{" "}
-            <span style={{ color: "#ff5b2f" }} className="fw-bold">
-              {title}
-            </span>
-            .
-          </p>
+        <h3 className="text-dark fw-bold mb-2">No Messages Yet</h3>
 
-          <div className="d-flex flex-wrap justify-content-center gap-2">
-            {["👋 Hello", "😊 How are you?", "🎉 Welcome"].map((message) => (
-              <button
-                key={message}
-                type="button"
-                onClick={() => onQuickMessage(message)}
-                className="btn rounded-pill px-4 py-2 fw-semibold border-0"
-                style={{
-                  background: "#fff3eb",
-                  color: "#ff5b2f",
-                }}
-              >
-                {message}
-              </button>
-            ))}
-          </div>
+        <p className="text-secondary mb-4 mx-auto" style={{ maxWidth: 360 }}>
+          Start a conversation with{" "}
+          <span style={{ color: "#ff5b2f" }} className="fw-bold">
+            {title}
+          </span>
+          .
+        </p>
+
+        <div className="d-flex flex-wrap justify-content-center gap-2">
+          {["👋 Hello", "😊 How are you?", "🎉 Welcome"].map((message) => (
+            <button
+              key={message}
+              type="button"
+              onClick={() => onQuickMessage(message)}
+              className="btn rounded-pill px-4 py-2 fw-semibold border-0"
+              style={{
+                background: "#fff3eb",
+                color: "#ff5b2f",
+              }}
+            >
+              {message}
+            </button>
+          ))}
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}

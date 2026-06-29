@@ -50,7 +50,6 @@ function ChatInfoContent() {
   const [allUsers, setAllUsers] = useState([]);
   const [inviteActionLoading, setInviteActionLoading] = useState(false);
 
-
   useEffect(() => {
     setCurrentUser(JSON.parse(localStorage.getItem("user") || "null"));
   }, []);
@@ -67,6 +66,9 @@ function ChatInfoContent() {
       (admin) =>
         (admin?._id || admin)?.toString() === currentUser?._id?.toString(),
     ) || false;
+
+  const canAddMembers =
+    isGroup && (isAdmin || conversation?.memberPermission === "all");
 
   const otherPerson = useMemo(() => {
     if (!conversation || isGroup) return null;
@@ -864,7 +866,6 @@ function ChatInfoContent() {
                   <button
                     type="button"
                     className="quick-btn"
-                    disabled={isChatRestricted || isGroup}
                     onClick={() => startCall("audio")}
                   >
                     <FaPhoneAlt className="d-block mx-auto mb-2" />
@@ -874,7 +875,6 @@ function ChatInfoContent() {
                   <button
                     type="button"
                     className="quick-btn"
-                    disabled={isChatRestricted || isGroup}
                     onClick={() => startCall("video")}
                   >
                     <FaVideo className="d-block mx-auto mb-2" />
@@ -906,42 +906,6 @@ function ChatInfoContent() {
 
             {isGroup && (
               <div className="soft-card mb-4">
-                <button className="option-row" onClick={generateInviteLink}>
-                  <span className="option-icon">
-                    <FaLink />
-                  </span>
-
-                  <span className="flex-grow-1 overflow-hidden">
-                    <span className="d-block fw-bold">
-                      Generate invite link
-                    </span>
-                    <small className="text-secondary text-truncate d-block">
-                      {conversation?.inviteLink || "No invite link"}
-                    </small>
-                  </span>
-                </button>
-
-                {conversation?.inviteLink && (
-                  <div className="p-3 d-flex gap-2">
-                    <button
-                      type="button"
-                      onClick={copyInviteLink}
-                      className="btn btn-light rounded-pill flex-fill fw-bold"
-                    >
-                      Copy
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={openShareInvite}
-                      className="btn rounded-pill flex-fill text-white fw-bold border-0"
-                      style={{ background: ORANGE }}
-                    >
-                      Share
-                    </button>
-                  </div>
-                )}
-
                 {isAdmin && (
                   <>
                     <button
@@ -1026,22 +990,59 @@ function ChatInfoContent() {
                       </span>
                     </button>
 
-                    <button
-                      className="option-row"
-                      onClick={() => updateGroup("generate_invite_link")}
-                    >
-                      <span className="option-icon">
-                        <FaLink />
-                      </span>
-                      <span>
-                        <span className="d-block fw-bold">
-                          Generate invite link
+                    <div className="option-row d-block">
+                      <div className="d-flex align-items-start gap-3">
+                        <span className="option-icon">
+                          <FaLink />
                         </span>
-                        <small className="text-secondary">
-                          {conversation?.inviteLink || "No invite link"}
-                        </small>
-                      </span>
-                    </button>
+
+                        <div className="flex-grow-1 overflow-hidden">
+                          <div className="d-flex align-items-center justify-content-between gap-2">
+                            <span className="fw-bold">Invite link</span>
+
+                            <button
+                              type="button"
+                              onClick={generateInviteLink}
+                              className="btn btn-sm rounded-pill text-white fw-bold border-0 px-3"
+                              style={{
+                                background: ORANGE,
+                                fontSize: 12,
+                              }}
+                            >
+                              {conversation?.inviteLink
+                                ? "Get New"
+                                : "Generate"}
+                            </button>
+                          </div>
+
+                          <small className="text-secondary text-truncate d-block mt-1">
+                            {conversation?.inviteLink ||
+                              "Generate a link to invite people"}
+                          </small>
+                        </div>
+                      </div>
+
+                      {conversation?.inviteLink && (
+                        <div className="d-flex gap-2 mt-3 ps-sm-5">
+                          <button
+                            type="button"
+                            onClick={copyInviteLink}
+                            className="btn btn-light rounded-pill flex-fill fw-bold border"
+                          >
+                            Copy
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={openShareInvite}
+                            className="btn rounded-pill flex-fill text-white fw-bold border-0"
+                            style={{ background: ORANGE }}
+                          >
+                            Share
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
 
@@ -1268,7 +1269,7 @@ function ChatInfoContent() {
                     </h5>
                   </div>
 
-                  {isAdmin && (
+                  {canAddMembers && (
                     <button
                       type="button"
                       onClick={openAddPeople}
