@@ -33,7 +33,10 @@ const UserSchema = new mongoose.Schema(
       type: String,
     },
 
-    avatar: String,
+    avatar: {
+      type: String,
+      default: "",
+    },
 
     about: {
       type: String,
@@ -46,6 +49,13 @@ const UserSchema = new mongoose.Schema(
     },
 
     lastSeen: Date,
+
+    blockedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
 
     fcmTokens: [
       {

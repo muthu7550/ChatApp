@@ -43,21 +43,51 @@ export async function GET(req) {
   });
 
 const conversationsWithPending = conversations.map((conversation) => {
-  const isAdmin = conversation.admins?.some(
+  const plainConversation = conversation.toObject();
+
+  const isAdmin = plainConversation.admins?.some(
     (admin) =>
       admin?._id?.toString() === userId ||
       admin?.toString() === userId
   );
 
   const pendingJoinCount = isAdmin
-    ? (conversation.joinRequests || []).filter(
+    ? (plainConversation.joinRequests || []).filter(
         (req) => req.status === "pending"
       ).length
     : 0;
 
+  let blockInfo = {
+    isBlockedByMe: false,
+    isBlockedByOther: false,
+  };
+
+  if (plainConversation.type === "direct") {
+    const currentMember = plainConversation.members?.find(
+      (member) => member?._id?.toString() === userId
+    );
+
+    const otherMember = plainConversation.members?.find(
+      (member) => member?._id?.toString() !== userId
+    );
+
+    blockInfo = {
+      isBlockedByMe:
+        currentMember?.blockedUsers?.some(
+          (id) => id?.toString() === otherMember?._id?.toString()
+        ) || false,
+
+      isBlockedByOther:
+        otherMember?.blockedUsers?.some(
+          (id) => id?.toString() === userId
+        ) || false,
+    };
+  }
+
   return {
-    ...conversation.toObject(),
+    ...plainConversation,
     pendingJoinCount,
+    ...blockInfo,
   };
 });
 
@@ -153,6 +183,7 @@ export async function POST(req) {
       },
       { status: 400 }
     );
+    
   } catch (error) {
     return NextResponse.json(
       {
@@ -237,7 +268,7 @@ export async function DELETE(req) {
   }
 );
 
-await Conversation.updateOne(
+await Conversation.updateOne( 
   { _id: conversationId },
   {
     $push: {

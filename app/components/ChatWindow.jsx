@@ -222,7 +222,13 @@ export default function ChatWindow({
 
   const isDirectChat = activeConversation?.type !== "group";
 
-  const isChatRestricted = isDirectChat && (isBlockedByMe || isBlockedByOther);
+  const finalIsBlockedByMe = activeConversation?.isBlockedByMe || isBlockedByMe;
+
+  const finalIsBlockedByOther =
+    activeConversation?.isBlockedByOther || isBlockedByOther;
+
+  const isChatRestricted =
+    isDirectChat && (finalIsBlockedByMe || finalIsBlockedByOther);
 
   async function fetchChatCalls() {
     if (!activeConversation?._id || !currentUser?._id) return;
@@ -409,15 +415,14 @@ export default function ChatWindow({
   }, [activeConversation?._id, currentUser?._id]);
 
   useEffect(() => {
-  if (!activeConversation?._id || !currentUser?._id) return;
+    if (!activeConversation?._id || !currentUser?._id) return;
 
-  const interval = setInterval(() => {
-    fetchMessages(false);
-  }, 2000);
+    const interval = setInterval(() => {
+      fetchMessages(false);
+    }, 2000);
 
-  return () => clearInterval(interval);
-}, [activeConversation?._id, currentUser?._id]);
-
+    return () => clearInterval(interval);
+  }, [activeConversation?._id, currentUser?._id]);
 
   async function deleteMessage(messageId, type = "me") {
     const ok = confirm(
@@ -563,7 +568,7 @@ export default function ChatWindow({
                   <h6 className="mb-0 text-dark fw-bold">Blocked Contact</h6>
 
                   <small className="text-danger">
-                    {isBlockedByMe
+                    {finalIsBlockedByMe
                       ? "You blocked this contact"
                       : "This contact blocked you"}
                   </small>
@@ -791,54 +796,51 @@ export default function ChatWindow({
           </div>
         )}
 
-        {isChatRestricted && (
-          <BlockedComposer
-            currentUser={currentUser}
-            otherPerson={otherPerson}
-            isBlockedByMe={isBlockedByMe}
-            isBlockedByOther={isBlockedByOther}
-            onUnblock={async () => {
-              const token = localStorage.getItem("token");
+    {isChatRestricted && (
+  <BlockedComposer
+    otherPerson={otherPerson}
+    isBlockedByMe={finalIsBlockedByMe}
+    isBlockedByOther={finalIsBlockedByOther}
+    onUnblock={async () => {
+      const token = localStorage.getItem("token");
 
-              const res = await fetch(
-                `/api/users/block?userId=${currentUser._id}&targetUserId=${otherPerson._id}`,
-                {
-                  method: "DELETE",
-                  headers: {
-                    Authorization: token ? `Bearer ${token}` : "",
-                  },
-                },
-              );
+      const res = await fetch(
+        `/api/users/block?userId=${currentUser._id}&targetUserId=${otherPerson._id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+        }
+      );
 
-              const result = await res.json();
+      const result = await res.json();
 
-              if (result?.success) {
-                const updatedBlockedUsers = localBlockedUsers.filter(
-                  (id) => id?.toString() !== otherPerson?._id?.toString(),
-                );
+      if (result?.success) {
+        const updatedBlockedUsers = localBlockedUsers.filter(
+          (id) => id?.toString() !== otherPerson?._id?.toString()
+        );
 
-                setLocalBlockedUsers(updatedBlockedUsers);
+        setLocalBlockedUsers(updatedBlockedUsers);
 
-                const oldUser = JSON.parse(
-                  localStorage.getItem("user") || "null",
-                );
-                localStorage.setItem(
-                  "user",
-                  JSON.stringify({
-                    ...oldUser,
-                    blockedUsers: updatedBlockedUsers,
-                  }),
-                );
+        const oldUser = JSON.parse(localStorage.getItem("user") || "null");
 
-                onRefreshConversations?.();
-                fetchMessages(false);
-                fetchChatCalls();
+        localStorage.setItem(
+          "user",
+          JSON.stringify({
+            ...oldUser,
+            blockedUsers: updatedBlockedUsers,
+          })
+        );
 
-                refreshActiveConversation();
-              }
-            }}
-          />
-        )}
+        onRefreshConversations?.();
+        fetchMessages(false);
+        fetchChatCalls();
+        refreshActiveConversation();
+      }
+    }}
+  />
+)}
 
         {showRealChat && !isChatRestricted && chatTimeline.length === 0 && (
           <EmptyChat onQuickMessage={sendQuickMessage} title={getChatTitle()} />
@@ -898,19 +900,19 @@ function BlockedComposer({
 }) {
   return (
     <div className="h-100 d-flex align-items-center justify-content-center px-3">
-      <div className="blocked-card mx-auto">
+      <div className="blocked-card mx-auto text-center">
         <div className="blocked-big-icon">🚫</div>
 
         <div className="fw-bold text-dark mb-1">
           {isBlockedByMe
             ? `You blocked ${otherPerson?.name || "this contact"}`
-            : "You can't message this contact"}
+            : `${otherPerson?.name || "This contact"} blocked you`}
         </div>
 
         <div className="text-secondary small mb-3">
           {isBlockedByMe
             ? "Messages, calls, media and profile details are hidden until you unblock."
-            : "Messages and calls are unavailable right now."}
+            : "You cannot send messages or make calls to this contact right now."}
         </div>
 
         {isBlockedByMe && (
