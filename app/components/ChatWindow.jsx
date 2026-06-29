@@ -376,12 +376,43 @@ export default function ChatWindow({
         return;
       }
 
-      const result = await res.json().catch(() => null);
+     const result = await res.json().catch(() => null);
 
-      if (!res.ok || !result?.success) {
-        alert(result?.error || "Message send failed");
-        return;
-      }
+if (!res.ok || !result?.success) {
+  alert(
+    `
+Status: ${res.status}
+
+Error: ${result?.error || "Unknown"}
+
+Conversation: ${activeConversation?._id || "Missing"}
+
+Sender: ${currentUser?._id || "Missing"}
+
+Token: ${token ? "Available" : "Missing"}
+
+Blocked By Me: ${finalIsBlockedByMe}
+
+Blocked By Other: ${finalIsBlockedByOther}
+
+Chat Restricted: ${isChatRestricted}
+`
+  );
+
+  console.error("SEND MESSAGE FAILED", {
+    status: res.status,
+    result,
+    payload: messagePayload,
+    token,
+    activeConversation,
+    currentUser,
+    finalIsBlockedByMe,
+    finalIsBlockedByOther,
+    isChatRestricted,
+  });
+
+  return;
+}
 
       setMessages((prev) => [...prev, result.message]);
       setTimeout(() => {
@@ -397,9 +428,20 @@ export default function ChatWindow({
         lockBottomForAWhile();
       }, 30);
     } catch (error) {
-      console.error("Send message error:", error);
-      alert("Message send failed");
-    }
+  console.error("Send message error:", error);
+
+  alert(
+    `
+Network Error
+
+${error?.message}
+
+Conversation: ${activeConversation?._id || "Missing"}
+
+Sender: ${currentUser?._id || "Missing"}
+`
+  );
+}
   }
 
   useEffect(() => {
