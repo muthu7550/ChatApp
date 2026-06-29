@@ -16,7 +16,7 @@
     "bootstrap": "^5.3.8",
     "cloudinary": "^2.10.0",
     "firebase": "^12.15.0",
-    "firebase-admin": "^14.0.0",
+    "firebase-admin": "^14.1.0",
     "jose": "^6.2.3",
     "livekit-client": "^2.19.2",
     "livekit-server-sdk": "^2.15.4",

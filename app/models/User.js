@@ -10,25 +10,34 @@ const UserSchema = new mongoose.Schema(
 
     email: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true,
       lowercase: true,
       trim: true,
     },
 
-    password: {
+    phone: {
       type: String,
-      required: true,
+      unique: true,
+      sparse: true,
+      trim: true,
     },
 
-    avatar: {
+    firebaseUid: {
       type: String,
-      default: "",
+      unique: true,
+      sparse: true,
     },
+
+    password: {
+      type: String,
+    },
+
+    avatar: String,
 
     about: {
       type: String,
-      default: "Hey there! I am using ChatterBox Pro Max",
+      default: "Hey there! I am using ChatterBox Pro Max 😂",
     },
 
     isOnline: {
@@ -36,27 +45,15 @@ const UserSchema = new mongoose.Schema(
       default: false,
     },
 
-    lastSeen: {
-      type: Date,
-      default: null,
-    },
+    lastSeen: Date,
 
     fcmTokens: [
       {
         type: String,
       },
     ],
-
-    blockedUsers: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 export default mongoose.models.User || mongoose.model("User", UserSchema);

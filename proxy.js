@@ -4,10 +4,14 @@ import { jwtVerify } from "jose";
 export async function proxy(req) {
   const path = req.nextUrl.pathname;
 
-  const publicRoutes = [
-    "/api/auth/login",
-    "/api/auth/register",
-  ];
+ const publicRoutes = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/forgot-password",
+  "/api/auth/login",
+  "/api/auth/register",
+  "/api/auth/phone-login",
+];
 
   const isPublicRoute = publicRoutes.some((route) =>
     path === route || path.startsWith(`${route}/`)

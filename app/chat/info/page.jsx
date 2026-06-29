@@ -45,6 +45,11 @@ function ChatInfoContent() {
   const [activeTab, setActiveTab] = useState("media");
   const [loading, setLoading] = useState(true);
   const [showGroupModal, setShowGroupModal] = useState(false);
+  const [showAddPeople, setShowAddPeople] = useState(false);
+  const [showShareInvite, setShowShareInvite] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+  const [inviteActionLoading, setInviteActionLoading] = useState(false);
+
 
   useEffect(() => {
     setCurrentUser(JSON.parse(localStorage.getItem("user") || "null"));
@@ -60,13 +65,13 @@ function ChatInfoContent() {
   const isAdmin =
     conversation?.admins?.some?.(
       (admin) =>
-        (admin?._id || admin)?.toString() === currentUser?._id?.toString()
+        (admin?._id || admin)?.toString() === currentUser?._id?.toString(),
     ) || false;
 
   const otherPerson = useMemo(() => {
     if (!conversation || isGroup) return null;
     return conversation?.members?.find(
-      (member) => member?._id !== currentUser?._id
+      (member) => member?._id !== currentUser?._id,
     );
   }, [conversation, currentUser?._id, isGroup]);
 
@@ -79,7 +84,7 @@ function ChatInfoContent() {
     conversation?.image ||
     otherPerson?.avatar ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(
-      title || "User"
+      title || "User",
     )}&background=ff6b2c&color=ffffff&bold=true`;
 
   const sortedMembers = useMemo(() => {
@@ -90,6 +95,12 @@ function ChatInfoContent() {
       return (a?.name || "").localeCompare(b?.name || "");
     });
   }, [conversation?.members, currentUser?._id]);
+
+  const pendingJoinRequests = useMemo(() => {
+    return (conversation?.joinRequests || []).filter(
+      (req) => req?.status === "pending",
+    );
+  }, [conversation?.joinRequests]);
 
   const media = [];
   const docs = [];
@@ -103,23 +114,37 @@ function ChatInfoContent() {
 
     const foundLinks = message?.text?.match?.(/(https?:\/\/[^\s]+)/g) || [];
     foundLinks.forEach((link) =>
-      links.push({ url: link, text: message?.text })
+      links.push({ url: link, text: message?.text }),
     );
   });
 
   const isBlockedByMe =
     !isGroup &&
     currentUser?.blockedUsers?.some?.(
-      (id) => id?.toString() === otherPerson?._id?.toString()
+      (id) => id?.toString() === otherPerson?._id?.toString(),
     );
 
   const isBlockedByOther =
     !isGroup &&
     otherPerson?.blockedUsers?.some?.(
-      (id) => id?.toString() === currentUser?._id?.toString()
+      (id) => id?.toString() === currentUser?._id?.toString(),
     );
 
   const isChatRestricted = !isGroup && (isBlockedByMe || isBlockedByOther);
+
+  async function loadUsersForAdd() {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(`/api/users?userId=${currentUser?._id}&search=`, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    });
+
+    const result = await res.json();
+    setAllUsers(result?.users || []);
+    setShowAddPeople(true);
+  }
 
   async function loadInfo() {
     try {
@@ -128,19 +153,19 @@ function ChatInfoContent() {
 
       const convRes = await fetch(
         `/api/conversations?userId=${currentUser._id}`,
-        { headers: { Authorization: token ? `Bearer ${token}` : "" } }
+        { headers: { Authorization: token ? `Bearer ${token}` : "" } },
       );
 
       const convResult = await convRes.json();
       const found = convResult?.conversations?.find(
-        (item) => item?._id === conversationId
+        (item) => item?._id === conversationId,
       );
 
       setConversation(found || null);
 
       const msgRes = await fetch(
         `/api/messages?conversationId=${conversationId}&userId=${currentUser._id}`,
-        { headers: { Authorization: token ? `Bearer ${token}` : "" } }
+        { headers: { Authorization: token ? `Bearer ${token}` : "" } },
       );
 
       const msgResult = await msgRes.json();
@@ -149,6 +174,139 @@ function ChatInfoContent() {
       console.error("Load chat info error:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function getInviteLink() {
+    return conversation?.inviteLink || "";
+  }
+
+  async function loadUsers() {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(`/api/users?userId=${currentUser?._id}&search=`, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    });
+
+    const result = await res.json();
+    setAllUsers(result?.users || []);
+  }
+
+  async function openAddPeople() {
+    await loadUsers();
+    setShowAddPeople(true);
+  }
+
+  async function openShareInvite() {
+    if (!conversation?.inviteLink) {
+      const result = await updateGroup("generate_invite_link");
+      if (!result?.conversation?.inviteLink) return;
+    }
+
+    await loadUsers();
+    setShowShareInvite(true);
+  }
+
+  async function addPeopleToGroup(selectedIds) {
+    await updateGroup("add_members", {
+      targetUserIds: selectedIds,
+    });
+
+    setShowAddPeople(false);
+    await loadInfo();
+  }
+
+  async function shareInviteToPrivateChats(selectedIds) {
+    for (const receiverId of selectedIds) {
+      const convRes = await fetch("/api/conversations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: "direct",
+          currentUserId: currentUser?._id,
+          receiverId,
+        }),
+      });
+
+      const convResult = await convRes.json();
+
+      if (convResult?.conversation?._id) {
+        const privateChatId = convResult.conversation._id;
+        const inviteLink = `${getInviteLink()}&from=${privateChatId}`;
+
+        await fetch("/api/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            conversationId: privateChatId,
+            senderId: currentUser?._id,
+            text: `Join my group "${conversation?.name}" 👇\n${inviteLink}`,
+            attachments: [],
+            location: null,
+          }),
+        });
+      }
+    }
+
+    setShowShareInvite(false);
+    alert("Invite sent to private chat");
+  }
+  async function generateInviteLink() {
+    const result = await updateGroup("generate_invite_link");
+
+    if (result?.conversation?.inviteLink) {
+      await navigator.clipboard.writeText(result.conversation.inviteLink);
+      alert("Invite link generated and copied");
+    }
+  }
+
+  async function copyInviteLink() {
+    if (!getInviteLink()) {
+      alert("Generate invite link first");
+      return;
+    }
+
+    await navigator.clipboard.writeText(getInviteLink());
+    alert("Invite link copied");
+  }
+
+  async function shareInviteToUsers(selectedIds = []) {
+    if (selectedIds.length === 0) return;
+
+    try {
+      setInviteActionLoading(true);
+
+      const inviteLink = getInviteLink();
+
+      await updateGroup("add_members", {
+        targetUserIds: selectedIds,
+      });
+
+      await fetch("/api/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          conversationId,
+          senderId: currentUser?._id,
+          text: `Group invite link: ${inviteLink}`,
+          attachments: [],
+          location: null,
+        }),
+      });
+
+      setShowShareInvite(false);
+      await loadInfo();
+      alert("Members added and invite message sent");
+    } finally {
+      setInviteActionLoading(false);
     }
   }
 
@@ -173,20 +331,20 @@ function ChatInfoContent() {
 
     if (!res.ok || !result?.success) {
       alert(result?.error || "Group update failed");
-      return;
+      return null;
     }
 
     if (action === "leave_group") {
       router.replace("/chat");
-      return;
+      return result;
     }
 
     setConversation(result.conversation);
+    return result;
   }
-
   async function clearChat() {
     const ok = confirm(
-      isGroup ? "Clear group messages for you?" : "Clear this chat for you?"
+      isGroup ? "Clear group messages for you?" : "Clear this chat for you?",
     );
     if (!ok) return;
 
@@ -197,7 +355,7 @@ function ChatInfoContent() {
       {
         method: "DELETE",
         headers: { Authorization: token ? `Bearer ${token}` : "" },
-      }
+      },
     );
 
     if (isGroup) {
@@ -256,7 +414,7 @@ function ChatInfoContent() {
       {
         method: "DELETE",
         headers: { Authorization: token ? `Bearer ${token}` : "" },
-      }
+      },
     );
 
     const result = await res.json();
@@ -269,7 +427,7 @@ function ChatInfoContent() {
     const updatedUser = {
       ...currentUser,
       blockedUsers: (currentUser?.blockedUsers || []).filter(
-        (id) => id?.toString() !== otherPerson?._id?.toString()
+        (id) => id?.toString() !== otherPerson?._id?.toString(),
       ),
     };
 
@@ -306,7 +464,7 @@ function ChatInfoContent() {
     }
 
     router.push(
-      `/call?room=${conversationId}&type=${type}&callId=${result?.call?._id}`
+      `/call?room=${conversationId}&type=${type}&callId=${result?.call?._id}`,
     );
   }
 
@@ -748,28 +906,41 @@ function ChatInfoContent() {
 
             {isGroup && (
               <div className="soft-card mb-4">
-                <button
-                  className="option-row"
-                  onClick={() => {
-                    const text = prompt(
-                      "Edit group about",
-                      conversation?.description || ""
-                    );
-                    if (text !== null) {
-                      updateGroup("update_description", { description: text });
-                    }
-                  }}
-                >
+                <button className="option-row" onClick={generateInviteLink}>
                   <span className="option-icon">
-                    <FaEdit />
+                    <FaLink />
                   </span>
-                  <span>
-                    <span className="d-block fw-bold">Edit group about</span>
-                    <small className="text-secondary">
-                      {conversation?.description || "No group about added"}
+
+                  <span className="flex-grow-1 overflow-hidden">
+                    <span className="d-block fw-bold">
+                      Generate invite link
+                    </span>
+                    <small className="text-secondary text-truncate d-block">
+                      {conversation?.inviteLink || "No invite link"}
                     </small>
                   </span>
                 </button>
+
+                {conversation?.inviteLink && (
+                  <div className="p-3 d-flex gap-2">
+                    <button
+                      type="button"
+                      onClick={copyInviteLink}
+                      className="btn btn-light rounded-pill flex-fill fw-bold"
+                    >
+                      Copy
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={openShareInvite}
+                      className="btn rounded-pill flex-fill text-white fw-bold border-0"
+                      style={{ background: ORANGE }}
+                    >
+                      Share
+                    </button>
+                  </div>
+                )}
 
                 {isAdmin && (
                   <>
@@ -926,7 +1097,10 @@ function ChatInfoContent() {
             <div className="soft-card">
               {!isGroup &&
                 (isBlockedByMe ? (
-                  <button className="option-row danger-row" onClick={unblockUser}>
+                  <button
+                    className="option-row danger-row"
+                    onClick={unblockUser}
+                  >
                     <span className="option-icon">
                       <FaBan />
                     </span>
@@ -1097,14 +1271,143 @@ function ChatInfoContent() {
                   {isAdmin && (
                     <button
                       type="button"
+                      onClick={openAddPeople}
                       className="btn rounded-pill px-3 fw-bold border-0"
                       style={{ background: "#fff3eb", color: "#ff5b2f" }}
                     >
-                      <FaUserPlus className="me-2" />
+                      <FaUserPlus className="me-2 d-inline-block" />
                       Add
                     </button>
                   )}
                 </div>
+                {isAdmin && pendingJoinRequests.length > 0 && (
+                  <div
+                    className="mb-4 rounded-4 p-3"
+                    style={{ background: "#fff7f1" }}
+                  >
+                    <div className="d-flex align-items-center justify-content-between mb-3">
+                      <div>
+                        <div className="section-title">Pending Requests</div>
+                        <h6 className="fw-bold mb-0">
+                          {pendingJoinRequests.length} join request
+                          {pendingJoinRequests.length > 1 ? "s" : ""}
+                        </h6>
+                      </div>
+                    </div>
+
+                    {pendingJoinRequests.map((request) => {
+                      const user = request?.user;
+
+                      return (
+                        <div
+                          key={user?._id || request?._id}
+                          className="d-flex align-items-center gap-3 bg-white rounded-4 p-3 mb-2 border"
+                        >
+                          <img
+                            src={user?.avatar || "/default-avatar.png"}
+                            className="rounded-circle object-fit-cover"
+                            width="46"
+                            height="46"
+                            alt={user?.name || "user"}
+                          />
+
+                          <div className="flex-grow-1 min-w-0">
+                            <div className="fw-bold text-truncate">
+                              {user?.name || "User"}
+                            </div>
+                            <small className="text-secondary d-block text-truncate">
+                              {user?.email || "Requested to join"}
+                            </small>
+                          </div>
+
+                          <div className="d-flex gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-success rounded-pill fw-bold"
+                              onClick={() =>
+                                updateGroup("approve_join_request", {
+                                  targetUserId: user?._id,
+                                }).then(() => loadInfo())
+                              }
+                            >
+                              Approve
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-danger rounded-pill fw-bold"
+                              onClick={() =>
+                                updateGroup("reject_join_request", {
+                                  targetUserId: user?._id,
+                                }).then(() => loadInfo())
+                              }
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {isAdmin && pendingJoinRequests.length > 0 && (
+                  <div
+                    className="mb-4 rounded-4 p-3"
+                    style={{ background: "#fff7f1" }}
+                  >
+                    <div className="section-title">Pending Join Requests</div>
+
+                    {pendingJoinRequests.map((request) => {
+                      const user = request?.user;
+
+                      return (
+                        <div
+                          key={request?._id}
+                          className="d-flex align-items-center gap-3 bg-white rounded-4 p-3 mb-2 border"
+                        >
+                          <img
+                            src={user?.avatar || "/default-avatar.png"}
+                            width="46"
+                            height="46"
+                            className="rounded-circle object-fit-cover"
+                            alt=""
+                          />
+
+                          <div className="flex-grow-1 min-w-0">
+                            <div className="fw-bold text-truncate">
+                              {user?.name || "User"}
+                            </div>
+                            <small className="text-secondary">
+                              Waiting for approval
+                            </small>
+                          </div>
+
+                          <button
+                            className="btn btn-sm btn-success rounded-pill fw-bold"
+                            onClick={() =>
+                              updateGroup("approve_join_request", {
+                                targetUserId: user?._id,
+                              }).then(() => loadInfo())
+                            }
+                          >
+                            Approve
+                          </button>
+
+                          <button
+                            className="btn btn-sm btn-outline-danger rounded-pill fw-bold"
+                            onClick={() =>
+                              updateGroup("reject_join_request", {
+                                targetUserId: user?._id,
+                              }).then(() => loadInfo())
+                            }
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div className="members-list">
                   {sortedMembers.map((member) => {
@@ -1114,7 +1417,7 @@ function ChatInfoContent() {
                     const isMemberAdmin =
                       conversation?.admins?.some(
                         (admin) =>
-                          (admin?._id || admin)?.toString() === memberId
+                          (admin?._id || admin)?.toString() === memberId,
                       ) || false;
 
                     return (
@@ -1126,7 +1429,7 @@ function ChatInfoContent() {
                           src={
                             member?.avatar ||
                             `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                              member?.name || "User"
+                              member?.name || "User",
                             )}&background=ff6b2c&color=ffffff&bold=true`
                           }
                           className="rounded-circle object-fit-cover flex-shrink-0"
@@ -1208,7 +1511,7 @@ function ChatInfoContent() {
         <CreateGroupModal
           currentUser={currentUser}
           users={(conversation?.members || []).filter(
-            (member) => member?._id !== currentUser?._id
+            (member) => member?._id !== currentUser?._id,
           )}
           conversations={[]}
           onClose={() => setShowGroupModal(false)}
@@ -1218,6 +1521,31 @@ function ChatInfoContent() {
               router.push(`/chat?conversationId=${newConversation._id}`);
             }
           }}
+        />
+      )}
+
+      {showAddPeople && (
+        <AddPeopleModal
+          title="Add people"
+          submitLabel="Add"
+          users={allUsers.filter(
+            (user) =>
+              !conversation?.members?.some(
+                (member) => member?._id?.toString() === user?._id?.toString(),
+              ),
+          )}
+          onClose={() => setShowAddPeople(false)}
+          onAdd={addPeopleToGroup}
+        />
+      )}
+
+      {showShareInvite && (
+        <AddPeopleModal
+          title="Share invite"
+          submitLabel="Send Invite"
+          users={allUsers.filter((user) => user?._id !== currentUser?._id)}
+          onClose={() => setShowShareInvite(false)}
+          onAdd={shareInviteToPrivateChats}
         />
       )}
     </main>
@@ -1262,6 +1590,103 @@ function EmptyInfo({ icon, text }) {
           {icon}
         </div>
         <div className="fw-bold text-secondary">{text}</div>
+      </div>
+    </div>
+  );
+}
+
+function AddPeopleModal({
+  users = [],
+  onClose,
+  onAdd,
+  title = "Add people",
+  submitLabel = "Add",
+}) {
+  const [selected, setSelected] = useState([]);
+
+  function toggleUser(id) {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  return (
+    <div
+      className="position-fixed top-0 start-0 w-100 h-100 bg-black bg-opacity-75 d-flex align-items-center justify-content-center p-3"
+      style={{ zIndex: 99999 }}
+    >
+      <div
+        className="bg-white rounded-4 shadow-lg w-100"
+        style={{ maxWidth: 460 }}
+      >
+        <div className="p-4 border-bottom d-flex justify-content-between">
+          <h5 className="fw-bold mb-0">{title}</h5>
+          <button
+            className="btn btn-sm btn-light rounded-circle"
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-3" style={{ maxHeight: 380, overflowY: "auto" }}>
+          {users.map((user) => (
+            <button
+              key={user?._id}
+              type="button"
+              onClick={() => toggleUser(user?._id)}
+              className="btn w-100 text-start d-flex align-items-center gap-3 rounded-4 p-3 mb-2"
+              style={{
+                background: selected.includes(user?._id)
+                  ? "#fff3eb"
+                  : "#f8fafc",
+              }}
+            >
+              <img
+                src={user?.avatar || "/default-avatar.png"}
+                className="rounded-circle object-fit-cover"
+                width="44"
+                height="44"
+                alt=""
+              />
+
+              <div className="flex-grow-1">
+                <div className="fw-bold">{user?.name}</div>
+                <small className="text-secondary">{user?.email}</small>
+              </div>
+
+              <input
+                type="checkbox"
+                checked={selected.includes(user?._id)}
+                readOnly
+              />
+            </button>
+          ))}
+
+          {users.length === 0 && (
+            <p className="text-center text-secondary py-4 mb-0">
+              No users available to add
+            </p>
+          )}
+        </div>
+
+        <div className="p-3 border-top d-flex gap-2">
+          <button
+            className="btn btn-light flex-fill rounded-4"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+
+          <button
+            className="btn flex-fill rounded-4 text-white fw-bold"
+            disabled={selected.length === 0}
+            style={{ background: "linear-gradient(135deg, #ff9d2e, #ff5b2f)" }}
+            onClick={() => onAdd(selected)}
+          >
+            {submitLabel} {selected.length || ""}
+          </button>
+        </div>
       </div>
     </div>
   );

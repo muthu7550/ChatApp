@@ -626,6 +626,8 @@ export default function Sidebar({
             </div>
           </div>
 
+
+
           {conversation?.unreadCount > 0 && (
             <span
               className="text-white rounded-circle d-flex align-items-center justify-content-center fw-bold ms-2"
@@ -641,6 +643,21 @@ export default function Sidebar({
                 : conversation?.unreadCount}
             </span>
           )}
+
+          {conversation?.type === "group" &&
+  conversation?.pendingJoinCount > 0 && (
+    <span
+      className="text-white rounded-pill d-flex align-items-center justify-content-center fw-bold ms-2 px-2"
+      style={{
+        minWidth: 24,
+        height: 24,
+        fontSize: 11,
+        background: "#f97316",
+      }}
+    >
+      {conversation.pendingJoinCount} req
+    </span>
+  )}
         </button>
 
         <div

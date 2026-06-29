@@ -392,9 +392,24 @@ export default function MessageBubble({
           <div className="bubble-deleted-pro">This message was deleted</div>
         ) : (
           <>
-            {message?.text && (
-              <div className="bubble-text-pro">{message.text}</div>
-            )}
+       {message?.text && (
+  <div className="pe-4 text-break" style={{ whiteSpace: "pre-wrap" }}>
+    {message.text.split(/(https?:\/\/[^\s]+)/g).map((part, index) =>
+      part.startsWith("http") ? (
+        <a
+          key={index}
+          href={part}
+          rel="noreferrer"
+          className="text-info fw-bold text-decoration-underline"
+        >
+          {part}
+        </a>
+      ) : (
+        <span key={index}>{part}</span>
+      )
+    )}
+  </div>
+)}
 
             {message?.attachments?.map((file, index) => (
               <AttachmentView

@@ -485,13 +485,7 @@ const isChatRestricted =
             className="d-flex align-items-center min-w-0 flex-grow-1"
             role="button"
             tabIndex={0}
-            onClick={() => {
-              if (activeConversation?._id) {
-                router.push(
-                  `/chat/info?conversationId=${activeConversation._id}`,
-                );
-              }
-            }}
+            
           >
             <button
               type="button"
@@ -508,11 +502,19 @@ const isChatRestricted =
                   <span className="blocked-icon">🚫</span>
                 </div>
               ) : (
+                <div onClick={() => {
+              if (activeConversation?._id) {
+                router.push(
+                  `/chat/info?conversationId=${activeConversation._id}`,
+                );
+              }
+            }}>
                 <ChatAvatar
                   conversation={activeConversation}
                   currentUser={currentUser}
                   size={44}
                 />
+                </div>
               )
             ) : (
               <HeaderAvatarSkeleton />
@@ -529,7 +531,13 @@ const isChatRestricted =
                     </small>
                   </>
                 ) : (
-                  <>
+                  <div onClick={() => {
+              if (activeConversation?._id) {
+                router.push(
+                  `/chat/info?conversationId=${activeConversation._id}`,
+                );
+              }
+            }}>
                     <h6 className="mb-0 text-dark fw-bold text-truncate">
                       {getChatTitle()}
                     </h6>
@@ -539,7 +547,7 @@ const isChatRestricted =
                         ? "Group chat"
                         : "Private chat"}
                     </small>
-                  </>
+                  </div>
                 )
               ) : (
                 <HeaderTextSkeleton />

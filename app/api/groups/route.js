@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "../../lib/db";
 import Conversation from "../../models/Conversation";
-import User from "../../models/User";
 
 export async function PATCH(req) {
   try {
     await dbConnect();
 
     const body = await req.json();
+
     const {
       conversationId,
       userId,
       action,
       targetUserId,
+      targetUserIds = [],
       description,
       groupPrivacy,
       messagePermission,
@@ -40,11 +41,14 @@ export async function PATCH(req) {
 
     const adminOnlyActions = [
       "add_member",
+      "add_members",
       "remove_member",
       "promote_admin",
       "demote_admin",
       "update_description",
       "update_settings",
+"approve_join_request",
+"reject_join_request",
     ];
 
     if (adminOnlyActions.includes(action) && !isAdmin) {
@@ -54,18 +58,21 @@ export async function PATCH(req) {
       );
     }
 
-    if (action === "leave_group") {
-      group.members = group.members.filter((id) => id.toString() !== userId);
-      group.admins = group.admins.filter((id) => id.toString() !== userId);
-
-      if (group.members.length === 0) {
-        await Conversation.findByIdAndDelete(conversationId);
-        return NextResponse.json({ success: true });
+    if (action === "add_members") {
+      if (!targetUserIds.length) {
+        return NextResponse.json(
+          { success: false, error: "targetUserIds required" },
+          { status: 400 }
+        );
       }
 
-      if (group.admins.length === 0) {
-        group.admins.push(group.members[0]);
-      }
+      const existingIds = group.members.map((id) => id.toString());
+
+      targetUserIds.forEach((id) => {
+        if (!existingIds.includes(id)) {
+          group.members.push(id);
+        }
+      });
     }
 
     if (action === "add_member") {
@@ -113,6 +120,20 @@ export async function PATCH(req) {
       if (typeof joinApproval === "boolean") group.joinApproval = joinApproval;
     }
 
+    if (action === "leave_group") {
+      group.members = group.members.filter((id) => id.toString() !== userId);
+      group.admins = group.admins.filter((id) => id.toString() !== userId);
+
+      if (group.members.length === 0) {
+        await Conversation.findByIdAndDelete(conversationId);
+        return NextResponse.json({ success: true });
+      }
+
+      if (group.admins.length === 0) {
+        group.admins.push(group.members[0]);
+      }
+    }
+
     if (action === "mute_group") {
       if (!group.muteUsers.some((id) => id.toString() === userId)) {
         group.muteUsers.push(userId);
@@ -125,9 +146,56 @@ export async function PATCH(req) {
       );
     }
 
-    if (action === "generate_invite_link") {
-      group.inviteLink = `${conversationId}-${Date.now()}`;
-    }
+if (action === "generate_invite_link") {
+  const inviteCode = `${conversationId}-${Date.now()}`;
+  group.inviteLink = `${req.nextUrl.origin}/join-group?invite=${inviteCode}`;
+}
+
+if (action === "approve_join_request") {
+  const request = group.joinRequests.find(
+    (req) =>
+      req.user?.toString() === targetUserId &&
+      req.status === "pending"
+  );
+
+  if (!request) {
+    return NextResponse.json(
+      { success: false, error: "Join request not found" },
+      { status: 404 }
+    );
+  }
+
+  request.status = "approved";
+
+  if (!group.members.some((id) => id.toString() === targetUserId)) {
+    group.members.push(targetUserId);
+  }
+
+  group.hiddenFor = (group.hiddenFor || []).filter(
+    (id) => id.toString() !== targetUserId
+  );
+
+  group.clearedFor = (group.clearedFor || []).filter(
+    (item) => item?.user?.toString() !== targetUserId
+  );
+}
+
+if (action === "reject_join_request") {
+  const request = group.joinRequests.find(
+    (req) =>
+      req.user?.toString() === targetUserId &&
+      req.status === "pending"
+  );
+
+  if (!request) {
+    return NextResponse.json(
+      { success: false, error: "Join request not found" },
+      { status: 404 }
+    );
+  }
+
+  request.status = "rejected";
+}
 
     await group.save();
 

@@ -26,24 +26,46 @@ export async function GET(req) {
       );
     }
 
-    const conversations = await Conversation.find({
-      members: userId,
-      hiddenFor: { $ne: userId },
-    })
-      .sort({ updatedAt: -1 })
-      .populate("members", "name email avatar about blockedUsers")
-      .populate({
-        path: "lastMessage",
-        populate: {
-          path: "sender",
-          select: "name avatar",
-        },
-      });
+   const conversations = await Conversation.find({
+  members: userId,
+  hiddenFor: { $ne: userId },
+})
+  .sort({ updatedAt: -1 })
+  .populate("members", "name email avatar about blockedUsers")
+  .populate("admins", "name email avatar")
+  .populate("joinRequests.user", "name email avatar")
+  .populate({
+    path: "lastMessage",
+    populate: {
+      path: "sender",
+      select: "name avatar",
+    },
+  });
 
-    return NextResponse.json({
-      success: true,
-      conversations,
-    });
+const conversationsWithPending = conversations.map((conversation) => {
+  const isAdmin = conversation.admins?.some(
+    (admin) =>
+      admin?._id?.toString() === userId ||
+      admin?.toString() === userId
+  );
+
+  const pendingJoinCount = isAdmin
+    ? (conversation.joinRequests || []).filter(
+        (req) => req.status === "pending"
+      ).length
+    : 0;
+
+  return {
+    ...conversation.toObject(),
+    pendingJoinCount,
+  };
+});
+
+return NextResponse.json({
+  success: true,
+  conversations: conversationsWithPending,
+});
+
   } catch (error) {
     console.error("GET conversations error:", error);
 
@@ -206,6 +228,31 @@ export async function DELETE(req) {
       message: "Chat deleted for you only",
     });
   }
+
+  await Conversation.updateOne(
+  { _id: conversationId },
+  {
+    $addToSet: { hiddenFor: userId },
+    $pull: { clearedFor: { user: userId } },
+  }
+);
+
+await Conversation.updateOne(
+  { _id: conversationId },
+  {
+    $push: {
+      clearedFor: {
+        user: userId,
+        clearedAt: new Date(),
+      },
+    },
+  }
+);
+
+return NextResponse.json({
+  success: true,
+  message: "Chat deleted for you only",
+});
 
 
   } catch (error) {
