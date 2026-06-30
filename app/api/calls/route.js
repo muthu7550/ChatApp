@@ -123,13 +123,13 @@ if (mode === "ringing") {
       .populate("receiver", "name avatar")
       .populate("conversation");
 
-    const missedCount = await Call.countDocuments({
-      members: userId,
-      caller: { $ne: userId },
-      status: "missed",
-      hiddenFor: { $ne: userId },
-    });
-
+const missedCount = await Call.countDocuments({
+  members: userId,
+  caller: { $ne: userId },
+  status: "missed",
+  hiddenFor: { $ne: userId },
+  missedSeenBy: { $ne: userId },
+});
     return NextResponse.json({
       success: true,
       calls,

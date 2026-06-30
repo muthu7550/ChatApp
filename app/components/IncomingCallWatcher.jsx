@@ -38,9 +38,20 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
     return call?.callType || call?.type || "audio";
   }
 
+  function closeIncomingCall(callId) {
+    if (callId) {
+      handledCallRef.current.add(callId);
+    }
+
+    stopNotifySound();
+    setAccepting(false);
+    setIncomingCall(null);
+  }
+
   function showCall(call) {
     if (!call?._id) return;
     if (handledCallRef.current.has(call._id)) return;
+    if (call?.status !== "ringing") return;
 
     setIncomingCall(call);
     setAccepting(false);
@@ -59,8 +70,12 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
       if (!incomingCallId || !currentUser?._id) return;
 
       try {
-        const res = await fetch(`/api/calls?callId=${incomingCallId}`, {
-          headers: getAuthHeaders(),
+        const res = await fetch(`/api/calls?callId=${incomingCallId}&t=${Date.now()}`, {
+          cache: "no-store",
+          headers: {
+            ...getAuthHeaders(),
+            "Cache-Control": "no-store",
+          },
         });
 
         const result = await res.json().catch(() => null);
@@ -68,6 +83,8 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
 
         if (call?._id && call?.status === "ringing") {
           showCall(call);
+        } else {
+          closeIncomingCall(call?._id || incomingCallId);
         }
       } catch (error) {
         console.error("Load incoming call error:", error);
@@ -85,16 +102,46 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
 
     async function pollCall() {
       if (cancelled || busy) return;
-      if (activeCallRef.current?._id) return;
 
       try {
         busy = true;
 
+        const currentActiveCall = activeCallRef.current;
+
+        if (currentActiveCall?._id) {
+          const res = await fetch(
+            `/api/calls?callId=${currentActiveCall._id}&t=${Date.now()}`,
+            {
+              cache: "no-store",
+              headers: {
+                ...getAuthHeaders(),
+                "Cache-Control": "no-store",
+              },
+            }
+          );
+
+          const result = await res.json().catch(() => null);
+          const latestCall = result?.call;
+
+          if (
+            !latestCall?._id ||
+            latestCall?.status !== "ringing" ||
+            latestCall?.caller?._id?.toString() === currentUser?._id?.toString()
+          ) {
+            closeIncomingCall(currentActiveCall._id);
+          }
+
+          return;
+        }
+
         const res = await fetch(
-          `/api/calls?userId=${currentUser._id}&mode=ringing`,
+          `/api/calls?userId=${currentUser._id}&mode=ringing&t=${Date.now()}`,
           {
             cache: "no-store",
-            headers: getAuthHeaders(),
+            headers: {
+              ...getAuthHeaders(),
+              "Cache-Control": "no-store",
+            },
           }
         );
 
@@ -113,7 +160,7 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
 
     pollCall();
 
-    const interval = setInterval(pollCall, 3000);
+    const interval = setInterval(pollCall, 1500);
 
     return () => {
       cancelled = true;
@@ -164,6 +211,7 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
 
     handledCallRef.current.add(call._id);
     setIncomingCall(null);
+    setAccepting(false);
 
     await fetch("/api/calls", {
       method: "PUT",
@@ -176,8 +224,8 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
       }),
     });
 
-    if (status === "accepted" && navigate) {
-      router.replace(`/call?room=${room}&type=${type}&callId=${call._id}`);
+    if (navigate) {
+      router.replace(`/chat?conversationId=${room}&callRefresh=${Date.now()}`);
     }
   }
 

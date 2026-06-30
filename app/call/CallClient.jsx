@@ -175,31 +175,44 @@ if (latestCall.status === "cancelled") {
     }
   }
 
-  async function endCall() {
-    if (ending) return;
+async function endCall() {
+  if (ending) return;
 
-    const authToken = localStorage.getItem("token");
+  const authToken = localStorage.getItem("token");
 
-    try {
-      setEnding(true);
+  try {
+    setEnding(true);
 
-      if (callId) {
-        await fetch("/api/calls", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: authToken ? `Bearer ${authToken}` : "",
-          },
-          body: JSON.stringify({
-            callId,
-            status: token ? "ended" : "cancelled",
-          }),
-        });
+    if (callId) {
+      const callerId = call?.caller?._id || call?.caller;
+      const isCaller = callerId?.toString() === user?._id?.toString();
+
+      let nextStatus = "cancelled";
+
+      if (token) {
+        nextStatus = "ended";
+      } else if (isCaller && call?.status === "ringing") {
+        nextStatus = "missed";
+      } else if (!isCaller && call?.status === "ringing") {
+        nextStatus = "rejected";
       }
-    } finally {
-      router.replace(`${backToChatUrl}&callRefresh=${Date.now()}`);
+
+      await fetch("/api/calls", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authToken ? `Bearer ${authToken}` : "",
+        },
+        body: JSON.stringify({
+          callId,
+          status: nextStatus,
+        }),
+      });
     }
+  } finally {
+    router.replace(`${backToChatUrl}&callRefresh=${Date.now()}`);
   }
+}
 
   async function callAgain() {
     setError("");

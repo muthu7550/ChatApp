@@ -321,6 +321,37 @@ async function startDirectChat(receiverId) {
     alert("Something went wrong");
   }
 }
+async function markMissedCallsSeen() {
+  if (!currentUser?._id) return;
+
+  try {
+    const res = await fetch("/api/calls/mark-seen", {
+      method: "PUT",
+      headers: getAuthHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({
+        userId: currentUser._id,
+      }),
+    });
+
+    const result = await res.json().catch(() => null);
+
+    if (res.ok && result?.success) {
+      setMissedCallCount(0);
+
+      setTimeout(() => {
+        fetchCalls();
+      }, 300);
+    }
+  } catch (error) {
+    console.error("Mark missed calls seen error:", error);
+  }
+}
+useEffect(() => {
+  if (activeFilter !== "calls") return;
+  markMissedCallsSeen();
+}, [activeFilter]);
 
   async function fetchCalls() {
     if (!currentUser?._id || callsFetchRunningRef.current) return;
@@ -1263,40 +1294,40 @@ const lastMessageText =
               {
                 key: "chats",
                 label: (
-                  <>
+                  <div className="d-flex">
                     Chats
                     {privateUnreadCount > 0 && (
                       <span className="tab-missed-badge">
                         {privateUnreadCount}
                       </span>
                     )}
-                  </>
+                  </div>
                 ),
               },
               {
                 key: "groups",
                 label: (
-                  <>
+                  <div className="d-flex">
                     Groups
                     {groupUnreadCount > 0 && (
                       <span className="tab-missed-badge">
                         {groupUnreadCount}
                       </span>
                     )}
-                  </>
+                  </div>
                 ),
               },
               {
                 key: "calls",
                 label: (
-                  <>
+                  <div className="d-flex">
                     Calls
                     {missedCallCount > 0 && (
                       <span className="tab-missed-badge">
                         {missedCallCount}
                       </span>
                     )}
-                  </>
+                  </div>
                 ),
               },
             ].map((item) => (
@@ -1320,7 +1351,7 @@ const lastMessageText =
           <div className="search-result-card">
             <div className="search-result-head">
               <span>
-                <FaPhoneAlt className="me-2" />
+                <FaPhoneAlt className="me-2 " />
                 Calls
               </span>
 

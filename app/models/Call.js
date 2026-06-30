@@ -33,6 +33,13 @@ const callSchema = new mongoose.Schema(
       },
     ],
 
+    missedSeenBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
     type: {
       type: String,
       enum: ["audio", "video"],
