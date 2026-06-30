@@ -17,7 +17,7 @@ export function createTransporter() {
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
-    },ss
+    },
   });
 }
 
