@@ -131,27 +131,33 @@ const res = await fetch(
     };
   }, [conversationIdFromUrl, currentUser?._id]);
 
-  useEffect(() => {
-    if (!activeConversation?._id || !currentUser?._id) return;
+useEffect(() => {
+  if (!activeConversation?._id || !currentUser?._id) return;
 
-    const isNewConversation =
-      loadedConversationRef.current !== activeConversation._id;
+  const conversationId = activeConversation._id;
 
-    if (!isNewConversation) return;
+  pendingMessagesRef.current = [];
+  hasInitialScrolledRef.current = false;
+  isUserNearBottomRef.current = true;
+  fetchingMessagesRef.current = false;
 
-    loadedConversationRef.current = activeConversation._id;
-    pendingMessagesRef.current = [];
-    hasInitialScrolledRef.current = false;
-    isUserNearBottomRef.current = true;
+  setMessages([]);
+  setChatCalls([]);
+  setShowRealChat(false);
+  setIsPreparingReveal(false);
+  setInitialChatLoading(true);
 
-    setMessages([]);
-    setShowRealChat(false);
-    setIsPreparingReveal(false);
-    setInitialChatLoading(true);
+  async function loadChat() {
+    loadedConversationRef.current = conversationId;
 
-    fetchMessages(true);
-    fetchChatCalls();
-  }, [activeConversation?._id, currentUser?._id]);
+    await Promise.allSettled([
+      fetchMessages(true, conversationId),
+      fetchChatCalls(conversationId),
+    ]);
+  }
+
+  loadChat();
+}, [activeConversation?._id, currentUser?._id]);
 
   useEffect(() => {
     setLocalBlockedUsers(currentUser?.blockedUsers || []);
@@ -181,11 +187,11 @@ const res = await fetch(
     }
   }
 
-  async function fetchMessages(initialLoad = false) {
+ async function fetchMessages(initialLoad = false, forcedConversationId = null) {
     if (fetchingMessagesRef.current) return;
-    if (!activeConversation?._id || !currentUser?._id) return;
+  const conversationId = forcedConversationId || activeConversation?._id;
 
-    const conversationId = activeConversation._id;
+if (!conversationId || !currentUser?._id) return;
 
     try {
       fetchingMessagesRef.current = true;
@@ -263,12 +269,14 @@ const res = await fetch(
   const isChatRestricted =
     isDirectChat && (finalIsBlockedByMe || finalIsBlockedByOther);
 
-  async function fetchChatCalls() {
-    if (!activeConversation?._id || !currentUser?._id) return;
+async function fetchChatCalls(forcedConversationId = null) {
+  const conversationId = forcedConversationId || activeConversation?._id;
+
+  if (!conversationId || !currentUser?._id) return;
 
     try {
       const res = await fetch(
-        `/api/calls?userId=${currentUser._id}&conversationId=${activeConversation._id}&t=${Date.now()}`,
+        `/api/calls?userId=${currentUser._id}&conversationId=${conversationId}&t=${Date.now()}`,
         {
           headers: {
             ...authHeaders,
@@ -650,7 +658,7 @@ Sender: ${currentUser?._id || "Missing"}
                 onClick={() => {
                   if (activeConversation?._id) {
                     router.push(
-                      `/chat/info?conversationId=${activeConversation._id}`,
+                      `/chat/info?conversationId=${conversationId}`,
                     );
                   }
                 }}
@@ -683,7 +691,7 @@ Sender: ${currentUser?._id || "Missing"}
                   onClick={() => {
                     if (activeConversation?._id) {
                       router.push(
-                        `/chat/info?conversationId=${activeConversation._id}`,
+                        `/chat/info?conversationId=${conversationId}`,
                       );
                     }
                   }}
