@@ -34,6 +34,7 @@ export default function ChatWindow({
   const bottomLockTimerRef = useRef(null);
   const hasInitialScrolledRef = useRef(false);
   const isUserNearBottomRef = useRef(true);
+  const loadingChatIdRef = useRef(null);
 
   const [activeConversation, setActiveConversation] = useState(
     conversation || null,
@@ -135,6 +136,8 @@ useEffect(() => {
   if (!activeConversation?._id || !currentUser?._id) return;
 
   const conversationId = activeConversation._id;
+  loadingChatIdRef.current = conversationId;
+  loadedConversationRef.current = conversationId;
 
   pendingMessagesRef.current = [];
   hasInitialScrolledRef.current = false;
@@ -147,17 +150,78 @@ useEffect(() => {
   setIsPreparingReveal(false);
   setInitialChatLoading(true);
 
-  async function loadChat() {
-    loadedConversationRef.current = conversationId;
-
-    await Promise.allSettled([
-      fetchMessages(true, conversationId),
-      fetchChatCalls(conversationId),
+  async function loadFullChat() {
+    const [messageResult, callResult] = await Promise.allSettled([
+      fetchMessagesData(conversationId),
+      fetchChatCallsData(conversationId),
     ]);
+
+    if (loadingChatIdRef.current !== conversationId) return;
+
+    const nextMessages =
+      messageResult.status === "fulfilled" ? messageResult.value : [];
+
+    const nextCalls =
+      callResult.status === "fulfilled" ? callResult.value : [];
+
+    setMessages(nextMessages);
+    setChatCalls(nextCalls);
+
+    setInitialChatLoading(false);
+    setIsPreparingReveal(true);
   }
 
-  loadChat();
+  loadFullChat();
 }, [activeConversation?._id, currentUser?._id]);
+
+async function fetchMessagesData(conversationId) {
+  if (!conversationId || !currentUser?._id) return [];
+
+  const res = await fetch(
+    `/api/messages?conversationId=${conversationId}&userId=${currentUser._id}&t=${Date.now()}`,
+    {
+      headers: {
+        ...authHeaders,
+        "Cache-Control": "no-store",
+      },
+      cache: "no-store",
+    }
+  );
+
+  const result = await res.json().catch(() => null);
+
+  if (!res.ok || !result?.success) {
+    console.error("Fetch messages failed:", result?.error);
+    return [];
+  }
+
+  return result?.messages || [];
+}
+
+async function fetchChatCallsData(conversationId) {
+  if (!conversationId || !currentUser?._id) return [];
+
+  const res = await fetch(
+    `/api/calls?userId=${currentUser._id}&conversationId=${conversationId}&t=${Date.now()}`,
+    {
+      headers: {
+        ...authHeaders,
+        "Cache-Control": "no-store",
+      },
+      cache: "no-store",
+    }
+  );
+
+  const result = await res.json().catch(() => null);
+
+  if (!res.ok || !result?.success) {
+    console.error("Fetch calls failed:", result?.error);
+    return [];
+  }
+
+  return result?.calls || [];
+}
+
 
   useEffect(() => {
     setLocalBlockedUsers(currentUser?.blockedUsers || []);
@@ -187,57 +251,21 @@ useEffect(() => {
     }
   }
 
- async function fetchMessages(initialLoad = false, forcedConversationId = null) {
-    if (fetchingMessagesRef.current) return;
+async function fetchMessages(initialLoad = false, forcedConversationId = null) {
   const conversationId = forcedConversationId || activeConversation?._id;
 
-if (!conversationId || !currentUser?._id) return;
+  if (!conversationId || !currentUser?._id) return;
 
-    try {
-      fetchingMessagesRef.current = true;
+  const nextMessages = await fetchMessagesData(conversationId);
 
-      const res = await fetch(
-        `/api/messages?conversationId=${conversationId}&userId=${currentUser._id}`,
-        { headers: authHeaders },
-      );
+  if (loadedConversationRef.current !== conversationId) return;
 
-      const result = await res.json().catch(() => null);
+  setMessages(nextMessages);
 
-      // IMPORTANT: do not clear old messages if API failed
-      if (!res.ok || !result?.success) {
-        console.error("Fetch messages failed:", result?.error);
-        return;
-      }
-
-      const nextMessages = result?.messages || [];
-
-      if (loadedConversationRef.current !== conversationId) return;
-
-      if (initialLoad) {
-        pendingMessagesRef.current = nextMessages;
-      } else {
-        const shouldAutoScroll = isUserNearBottomRef.current;
-
-        setMessages(nextMessages);
-
-        if (shouldAutoScroll) {
-          requestAnimationFrame(() => scrollToBottomHard());
-        }
-      }
-    } catch (error) {
-      console.error("Fetch messages error:", error);
-    } finally {
-      fetchingMessagesRef.current = false;
-
-      if (initialLoad && loadedConversationRef.current === conversationId) {
-        setTimeout(() => {
-          setMessages(pendingMessagesRef.current);
-          setInitialChatLoading(false);
-          setIsPreparingReveal(true);
-        }, 180);
-      }
-    }
+  if (!initialLoad && isUserNearBottomRef.current) {
+    requestAnimationFrame(() => scrollToBottomHard());
   }
+}
 
   useEffect(() => {
   if (!activeConversation?._id || !currentUser?._id) return;
@@ -274,31 +302,13 @@ async function fetchChatCalls(forcedConversationId = null) {
 
   if (!conversationId || !currentUser?._id) return;
 
-    try {
-      const res = await fetch(
-        `/api/calls?userId=${currentUser._id}&conversationId=${conversationId}&t=${Date.now()}`,
-        {
-          headers: {
-            ...authHeaders,
-            "Cache-Control": "no-store",
-          },
-          cache: "no-store",
-        },
-      );
+  const nextCalls = await fetchChatCallsData(conversationId);
 
-      const result = await res.json().catch(() => null);
+  if (loadedConversationRef.current !== conversationId) return;
 
-      if (!res.ok || !result?.success) {
-        setChatCalls([]);
-        return;
-      }
+  setChatCalls(nextCalls);
+}
 
-      setChatCalls(result?.calls || []);
-    } catch (error) {
-      console.error("Fetch chat calls error:", error);
-      setChatCalls([]);
-    }
-  }
 async function markActiveChatAsRead() {
   if (!activeConversation?._id || !currentUser?._id) return;
 
@@ -658,7 +668,7 @@ Sender: ${currentUser?._id || "Missing"}
                 onClick={() => {
                   if (activeConversation?._id) {
                     router.push(
-                      `/chat/info?conversationId=${conversationId}`,
+                     `/chat/info?conversationId=${activeConversation._id}`
                     );
                   }
                 }}
@@ -691,7 +701,7 @@ Sender: ${currentUser?._id || "Missing"}
                   onClick={() => {
                     if (activeConversation?._id) {
                       router.push(
-                        `/chat/info?conversationId=${conversationId}`,
+                       `/chat/info?conversationId=${activeConversation._id}`
                       );
                     }
                   }}
