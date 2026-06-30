@@ -52,6 +52,13 @@ export default function Sidebar({
 
   const profileMenuRef = useRef(null);
   const chatMenuRef = useRef(null);
+  const conversationFetchRunningRef = useRef(false);
+const usersFetchRunningRef = useRef(false);
+const callsFetchRunningRef = useRef(false);
+
+const [conversationsFetched, setConversationsFetched] = useState(false);
+const [usersFetched, setUsersFetched] = useState(false);
+const [callsFetched, setCallsFetched] = useState(false);
 
   const orangeGradient = "linear-gradient(135deg, #ff9d2e, #ff5b2f)";
 
@@ -131,9 +138,9 @@ export default function Sidebar({
   useEffect(() => {
     if (!currentUser?._id) return;
 
-    fetchConversations(conversations.length === 0);
-    fetchUsers("", users.length === 0);
-    fetchCalls();
+fetchConversations(!conversationsFetched);
+fetchUsers("", !usersFetched);
+fetchCalls();
 
     const interval = setInterval(() => {
       fetchConversations(false);
@@ -182,50 +189,68 @@ export default function Sidebar({
     };
   }, []);
 
-  async function fetchConversations(showLoader = false) {
-    try {
-      if (showLoader && conversations.length === 0) {
-        setConversationsLoading(true);
-      }
+async function fetchConversations(showLoader = false) {
+  if (!currentUser?._id || conversationFetchRunningRef.current) return;
 
-      const res = await fetch(`/api/conversations?userId=${currentUser?._id}`, {
-        headers: getAuthHeaders(),
-      });
+  try {
+    conversationFetchRunningRef.current = true;
 
-      if (await handleUnauthorized(res)) return;
+    if (showLoader && !conversationsFetched) {
+      setConversationsLoading(true);
+    }
 
-      const result = await res.json();
+    const res = await fetch(`/api/conversations?userId=${currentUser._id}`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (await handleUnauthorized(res)) return;
+
+    const result = await res.json().catch(() => null);
+
+    if (result?.success) {
       setConversations(result?.conversations || []);
-    } catch (error) {
-      console.error("Fetch conversations error:", error);
-      setConversations([]);
-    } finally {
-      if (showLoader) setConversationsLoading(false);
     }
+  } catch (error) {
+    console.error("Fetch conversations error:", error);
+  } finally {
+    setConversationsFetched(true);
+    setConversationsLoading(false);
+    conversationFetchRunningRef.current = false;
   }
+}
 
-  async function fetchUsers(searchText = "", showLoader = false) {
-    try {
-      if (showLoader) setUsersLoading(true);
+async function fetchUsers(searchText = "", showLoader = false) {
+  if (!currentUser?._id || usersFetchRunningRef.current) return;
 
-      const res = await fetch(
-        `/api/users?userId=${currentUser?._id}&search=${searchText}`,
-        {
-          headers: getAuthHeaders(),
-        },
-      );
+  try {
+    usersFetchRunningRef.current = true;
 
-      if (await handleUnauthorized(res)) return;
+    if (showLoader && !usersFetched) {
+      setUsersLoading(true);
+    }
 
-      const result = await res.json();
+    const res = await fetch(
+      `/api/users?userId=${currentUser._id}&search=${encodeURIComponent(searchText)}`,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (await handleUnauthorized(res)) return;
+
+    const result = await res.json().catch(() => null);
+
+    if (result?.success || result?.users) {
       setUsers(result?.users || []);
-    } catch (error) {
-      console.error("Fetch users error:", error);
-      setUsers([]);
-    } finally {
-      if (showLoader) setUsersLoading(false);
     }
+  } catch (error) {
+    console.error("Fetch users error:", error);
+  } finally {
+    setUsersFetched(true);
+    setUsersLoading(false);
+    usersFetchRunningRef.current = false;
   }
+}
 
   async function startDirectChat(receiverId) {
     const token = localStorage.getItem("token");
@@ -286,16 +311,29 @@ export default function Sidebar({
     }
   }
 
-  async function fetchCalls() {
-    const res = await fetch(`/api/calls?userId=${currentUser?._id}`, {
+async function fetchCalls() {
+  if (!currentUser?._id || callsFetchRunningRef.current) return;
+
+  try {
+    callsFetchRunningRef.current = true;
+
+    const res = await fetch(`/api/calls?userId=${currentUser._id}`, {
       headers: getAuthHeaders(),
     });
 
-    const result = await res.json();
+    if (await handleUnauthorized(res)) return;
+
+    const result = await res.json().catch(() => null);
 
     setCalls(result?.calls || []);
     setMissedCallCount(result?.missedCount || 0);
+  } catch (error) {
+    console.error("Fetch calls error:", error);
+  } finally {
+    setCallsFetched(true);
+    callsFetchRunningRef.current = false;
   }
+}
 
   async function startCallFromNetwork(receiverId, type) {
     const token = localStorage.getItem("token");
@@ -1265,7 +1303,9 @@ export default function Sidebar({
               </span>
             </div>
 
-            {calls.length > 0 ? (
+           {!callsFetched ? (
+  <SidebarSkeleton count={4} />
+) : calls.length > 0 ? (
               calls.map((call) => {
                 const isOutgoing = call?.caller?._id === currentUser?._id;
                 const person = isOutgoing ? call?.receiver : call?.caller;
@@ -1409,7 +1449,7 @@ export default function Sidebar({
                clearIcon={null}
 onClear={null}
               >
-                {conversationsLoading ? (
+               {!conversationsFetched || conversationsLoading ? (
                   <SidebarSkeleton count={3} />
                 ) : groupChats.length > 0 ? (
                   groupChats.map((conversation) =>
@@ -1446,7 +1486,7 @@ onClear={null}
                 clearIcon={privateChats.length > 0 ? <FaTrashAlt /> : null}
                 onClear={() => clearConversationsByType("direct")}
               >
-                {conversationsLoading ? (
+               {!conversationsFetched || conversationsLoading ? (
                   <SidebarSkeleton count={5} />
                 ) : privateChats.length > 0 ? (
                   privateChats.map((conversation) =>

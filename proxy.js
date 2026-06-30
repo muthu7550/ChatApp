@@ -16,6 +16,12 @@ const publicRoutes = [
   "/api/auth/reset-password",
   "/api/auth/send-otp",
   "/api/auth/verify-otp",
+  "/api/auth/whatsapp/send-otp",
+"/api/auth/google",
+"/api/auth/google/callback",
+"/api/auth/github",
+"/api/auth/github/callback",
+"/api/auth/demo-login",
 ];  
 
   const isPublicRoute = publicRoutes.some(

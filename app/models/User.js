@@ -63,6 +63,18 @@ const UserSchema = new mongoose.Schema(
       },
     ],
   },
+  {
+    provider: {
+  type: String,
+  enum: ["credentials", "google", "github", "demo"],
+  default: "credentials",
+},
+
+providerId: {
+  type: String,
+  default: "",
+},
+  },
   { timestamps: true }
 );
 

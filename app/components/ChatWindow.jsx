@@ -31,6 +31,8 @@ export default function ChatWindow({
   const fetchingMessagesRef = useRef(false);
   const pendingMessagesRef = useRef([]);
   const bottomLockTimerRef = useRef(null);
+  const hasInitialScrolledRef = useRef(false);
+const isUserNearBottomRef = useRef(true);
 
   const [activeConversation, setActiveConversation] = useState(
     conversation || null,
@@ -77,8 +79,10 @@ export default function ChatWindow({
     async function hydrateConversation() {
       try {
         setIsHydratingConversation(true);
-        setShowRealChat(false);
-        setIsPreparingReveal(false);
+        if (!activeConversation?._id) {
+          setShowRealChat(false);
+          setIsPreparingReveal(false);
+        }
 
         const res = await fetch(
           `/api/conversations?userId=${currentUser._id}`,
@@ -120,6 +124,8 @@ export default function ChatWindow({
 
     loadedConversationRef.current = activeConversation._id;
     pendingMessagesRef.current = [];
+    hasInitialScrolledRef.current = false;
+isUserNearBottomRef.current = true;
 
     setMessages([]);
     setShowRealChat(false);
@@ -187,10 +193,15 @@ export default function ChatWindow({
 
       if (initialLoad) {
         pendingMessagesRef.current = nextMessages;
-      } else {
-        setMessages(nextMessages);
-        requestAnimationFrame(() => scrollToBottomHard());
-      }
+    } else {
+  const shouldAutoScroll = isUserNearBottomRef.current;
+
+  setMessages(nextMessages);
+
+  if (shouldAutoScroll) {
+    requestAnimationFrame(() => scrollToBottomHard());
+  }
+} 
     } catch (error) {
       console.error("Fetch messages error:", error);
     } finally {
@@ -279,10 +290,16 @@ export default function ChatWindow({
     }
 
     requestAnimationFrame(() => {
-      scrollToBottomHard();
+     if (!hasInitialScrolledRef.current) {
+  scrollToBottomHard();
+  hasInitialScrolledRef.current = true;
+}
 
       requestAnimationFrame(() => {
-        scrollToBottomHard();
+       if (!hasInitialScrolledRef.current) {
+  scrollToBottomHard();
+  hasInitialScrolledRef.current = true;
+}
 
         setShowRealChat(true);
         setIsPreparingReveal(false);
@@ -292,24 +309,24 @@ export default function ChatWindow({
     });
   }, [isPreparingReveal, messages.length]);
 
-  useEffect(() => {
-    if (!showRealChat) return;
-    if (!chatBodyRef.current) return;
+useEffect(() => {
+  if (!showRealChat) return;
+  if (!chatBodyRef.current) return;
 
-    const body = chatBodyRef.current;
+  const body = chatBodyRef.current;
 
-    const observer = new ResizeObserver(() => {
+  const observer = new ResizeObserver(() => {
+    if (isUserNearBottomRef.current) {
       scrollToBottomHard();
-    });
-
-    observer.observe(body);
-
-    if (messageListRef.current) {
-      observer.observe(messageListRef.current);
     }
+  });
 
-    return () => observer.disconnect();
-  }, [showRealChat, activeConversation?._id]);
+  if (messageListRef.current) {
+    observer.observe(messageListRef.current);
+  }
+
+  return () => observer.disconnect();
+}, [showRealChat, activeConversation?._id]);
 
   function lockBottomForAWhile() {
     if (bottomLockTimerRef.current) {
@@ -328,12 +345,22 @@ export default function ChatWindow({
     }, 80);
   }
 
-  function scrollToBottomHard() {
-    const body = chatBodyRef.current;
-    if (!body) return;
+function isNearBottom() {
+  const body = chatBodyRef.current;
+  if (!body) return true;
 
-    body.scrollTop = body.scrollHeight;
-  }
+  const distanceFromBottom =
+    body.scrollHeight - body.scrollTop - body.clientHeight;
+
+  return distanceFromBottom < 120;
+}
+
+function scrollToBottomHard() {
+  const body = chatBodyRef.current;
+  if (!body) return;
+
+  body.scrollTop = body.scrollHeight;
+}
 
   async function sendMessage(payload = {}) {
     const token = localStorage.getItem("token");
@@ -376,11 +403,11 @@ export default function ChatWindow({
         return;
       }
 
-     const result = await res.json().catch(() => null);
+      const result = await res.json().catch(() => null);
 
-if (!res.ok || !result?.success) {
-  alert(
-    `
+      if (!res.ok || !result?.success) {
+        alert(
+          `
 Status: ${res.status}
 
 Error: ${result?.error || "Unknown"}
@@ -396,23 +423,23 @@ Blocked By Me: ${finalIsBlockedByMe}
 Blocked By Other: ${finalIsBlockedByOther}
 
 Chat Restricted: ${isChatRestricted}
-`
-  );
+`,
+        );
 
-  console.error("SEND MESSAGE FAILED", {
-    status: res.status,
-    result,
-    payload: messagePayload,
-    token,
-    activeConversation,
-    currentUser,
-    finalIsBlockedByMe,
-    finalIsBlockedByOther,
-    isChatRestricted,
-  });
+        console.error("SEND MESSAGE FAILED", {
+          status: res.status,
+          result,
+          payload: messagePayload,
+          token,
+          activeConversation,
+          currentUser,
+          finalIsBlockedByMe,
+          finalIsBlockedByOther,
+          isChatRestricted,
+        });
 
-  return;
-}
+        return;
+      }
 
       setMessages((prev) => [...prev, result.message]);
       setTimeout(() => {
@@ -428,10 +455,10 @@ Chat Restricted: ${isChatRestricted}
         lockBottomForAWhile();
       }, 30);
     } catch (error) {
-  console.error("Send message error:", error);
+      console.error("Send message error:", error);
 
-  alert(
-    `
+      alert(
+        `
 Network Error
 
 ${error?.message}
@@ -439,9 +466,9 @@ ${error?.message}
 Conversation: ${activeConversation?._id || "Missing"}
 
 Sender: ${currentUser?._id || "Missing"}
-`
-  );
-}
+`,
+      );
+    }
   }
 
   useEffect(() => {
@@ -807,10 +834,13 @@ Sender: ${currentUser?._id || "Missing"}
 
       {renderHeader()}
 
-      <section
-        ref={chatBodyRef}
-        className="chat-body flex-grow-1 min-h-0 overflow-auto"
-      >
+<section
+  ref={chatBodyRef}
+  onScroll={() => {
+    isUserNearBottomRef.current = isNearBottom();
+  }}
+  className="chat-body flex-grow-1 min-h-0 overflow-auto"
+>
         {!isChatRestricted && chatTimeline.length > 0 && (
           <div
             ref={messageListRef}
@@ -838,51 +868,53 @@ Sender: ${currentUser?._id || "Missing"}
           </div>
         )}
 
-    {isChatRestricted && (
-  <BlockedComposer
-    otherPerson={otherPerson}
-    isBlockedByMe={finalIsBlockedByMe}
-    isBlockedByOther={finalIsBlockedByOther}
-    onUnblock={async () => {
-      const token = localStorage.getItem("token");
+        {isChatRestricted && (
+          <BlockedComposer
+            otherPerson={otherPerson}
+            isBlockedByMe={finalIsBlockedByMe}
+            isBlockedByOther={finalIsBlockedByOther}
+            onUnblock={async () => {
+              const token = localStorage.getItem("token");
 
-      const res = await fetch(
-        `/api/users/block?userId=${currentUser._id}&targetUserId=${otherPerson._id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-        }
-      );
+              const res = await fetch(
+                `/api/users/block?userId=${currentUser._id}&targetUserId=${otherPerson._id}`,
+                {
+                  method: "DELETE",
+                  headers: {
+                    Authorization: token ? `Bearer ${token}` : "",
+                  },
+                },
+              );
 
-      const result = await res.json();
+              const result = await res.json();
 
-      if (result?.success) {
-        const updatedBlockedUsers = localBlockedUsers.filter(
-          (id) => id?.toString() !== otherPerson?._id?.toString()
-        );
+              if (result?.success) {
+                const updatedBlockedUsers = localBlockedUsers.filter(
+                  (id) => id?.toString() !== otherPerson?._id?.toString(),
+                );
 
-        setLocalBlockedUsers(updatedBlockedUsers);
+                setLocalBlockedUsers(updatedBlockedUsers);
 
-        const oldUser = JSON.parse(localStorage.getItem("user") || "null");
+                const oldUser = JSON.parse(
+                  localStorage.getItem("user") || "null",
+                );
 
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            ...oldUser,
-            blockedUsers: updatedBlockedUsers,
-          })
-        );
+                localStorage.setItem(
+                  "user",
+                  JSON.stringify({
+                    ...oldUser,
+                    blockedUsers: updatedBlockedUsers,
+                  }),
+                );
 
-        onRefreshConversations?.();
-        fetchMessages(false);
-        fetchChatCalls();
-        refreshActiveConversation();
-      }
-    }}
-  />
-)}
+                onRefreshConversations?.();
+                fetchMessages(false);
+                fetchChatCalls();
+                refreshActiveConversation();
+              }
+            }}
+          />
+        )}
 
         {showRealChat && !isChatRestricted && chatTimeline.length === 0 && (
           <EmptyChat onQuickMessage={sendQuickMessage} title={getChatTitle()} />

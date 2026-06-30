@@ -231,6 +231,10 @@ export default function Composer({ onSend, currentUser }) {
   }
 
   async function handleSend() {
+      setText("");
+      setPendingFile(null);
+      clearVoicePreview();
+      setShowEmojiGif(false);
     if (!currentUser?._id) return alert("Please login again");
     if (!text.trim() && !pendingFile && !voiceBlob) return;
 
@@ -248,10 +252,7 @@ export default function Composer({ onSend, currentUser }) {
         location: null,
       });
 
-      setText("");
-      setPendingFile(null);
-      clearVoicePreview();
-      setShowEmojiGif(false);
+    
     } catch (error) {
       console.error(error);
       alert(error.message || "Send failed");
