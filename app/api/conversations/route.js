@@ -11,6 +11,7 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
+    const selectedConversationId = searchParams.get("conversationId");
 
     if (!userId) {
       return NextResponse.json(
@@ -26,76 +27,113 @@ export async function GET(req) {
       );
     }
 
-   const conversations = await Conversation.find({
-  members: userId,
-  hiddenFor: { $ne: userId },
-})
-  .sort({ updatedAt: -1 })
-  .populate("members", "name email avatar about blockedUsers")
-  .populate("admins", "name email avatar")
-  .populate("joinRequests.user", "name email avatar")
-  .populate({
-    path: "lastMessage",
-    populate: {
-      path: "sender",
-      select: "name avatar",
-    },
-  });
+    const conversations = await Conversation.find({
+      members: userId,
+      hiddenFor: { $ne: userId },
+    })
+      .sort({ updatedAt: -1 })
+      .populate("members", "name email avatar about blockedUsers")
+      .populate("admins", "name email avatar")
+      .populate("joinRequests.user", "name email avatar");
 
-const conversationsWithPending = conversations.map((conversation) => {
-  const plainConversation = conversation.toObject();
+    const conversationsWithPending = await Promise.all(
+      conversations.map(async (conversation) => {
+        const plainConversation = conversation.toObject();
 
-  const isAdmin = plainConversation.admins?.some(
-    (admin) =>
-      admin?._id?.toString() === userId ||
-      admin?.toString() === userId
-  );
+        const clearedData = plainConversation.clearedFor?.find(
+          (item) => item?.user?.toString() === userId.toString()
+        );
 
-  const pendingJoinCount = isAdmin
-    ? (plainConversation.joinRequests || []).filter(
-        (req) => req.status === "pending"
-      ).length
-    : 0;
+        const lastMessageQuery = {
+          conversation: plainConversation._id,
+          deletedFor: { $ne: userId },
+        };
 
-  let blockInfo = {
-    isBlockedByMe: false,
-    isBlockedByOther: false,
-  };
+        if (clearedData?.clearedAt) {
+          lastMessageQuery.createdAt = { $gt: clearedData.clearedAt };
+        }
 
-  if (plainConversation.type === "direct") {
-    const currentMember = plainConversation.members?.find(
-      (member) => member?._id?.toString() === userId
+        const visibleLastMessage = await Message.findOne(lastMessageQuery)
+          .sort({ createdAt: -1 })
+          .populate("sender", "name avatar");
+
+        const unreadCount = await Message.countDocuments({
+          conversation: plainConversation._id,
+          sender: { $ne: userId },
+          seenBy: { $ne: userId },
+          deletedFor: { $ne: userId },
+          ...(clearedData?.clearedAt
+            ? { createdAt: { $gt: clearedData.clearedAt } }
+            : {}),
+        });
+
+        plainConversation.lastMessage = visibleLastMessage;
+        plainConversation.unreadCount = unreadCount;
+
+        const isAdmin = plainConversation.admins?.some(
+          (admin) =>
+            admin?._id?.toString() === userId ||
+            admin?.toString() === userId
+        );
+
+        const pendingJoinCount = isAdmin
+          ? (plainConversation.joinRequests || []).filter(
+              (req) => req.status === "pending"
+            ).length
+          : 0;
+
+        let blockInfo = {
+          isBlockedByMe: false,
+          isBlockedByOther: false,
+        };
+
+        if (plainConversation.type === "direct") {
+          const currentMember = plainConversation.members?.find(
+            (member) => member?._id?.toString() === userId
+          );
+
+          const otherMember = plainConversation.members?.find(
+            (member) => member?._id?.toString() !== userId
+          );
+
+          blockInfo = {
+            isBlockedByMe:
+              currentMember?.blockedUsers?.some(
+                (id) => id?.toString() === otherMember?._id?.toString()
+              ) || false,
+
+            isBlockedByOther:
+              otherMember?.blockedUsers?.some(
+                (id) => id?.toString() === userId
+              ) || false,
+          };
+        }
+
+        return {
+          ...plainConversation,
+          pendingJoinCount,
+          ...blockInfo,
+        };
+      })
     );
 
-    const otherMember = plainConversation.members?.find(
-      (member) => member?._id?.toString() !== userId
-    );
+const visibleConversations = conversationsWithPending.filter((conversation) => {
+  const isSelected =
+    selectedConversationId === conversation?._id?.toString();
 
-    blockInfo = {
-      isBlockedByMe:
-        currentMember?.blockedUsers?.some(
-          (id) => id?.toString() === otherMember?._id?.toString()
-        ) || false,
+  if (isSelected) return true;
 
-      isBlockedByOther:
-        otherMember?.blockedUsers?.some(
-          (id) => id?.toString() === userId
-        ) || false,
-    };
-  }
+  if (conversation.type !== "direct") return true;
 
-  return {
-    ...plainConversation,
-    pendingJoinCount,
-    ...blockInfo,
-  };
+  if (conversation.lastMessage) return true;
+
+  return conversation.createdBy?.toString() === userId.toString();
 });
 
-return NextResponse.json({
-  success: true,
-  conversations: conversationsWithPending,
-});
-
+    return NextResponse.json({
+      success: true,
+      conversations: visibleConversations,
+    });
   } catch (error) {
     console.error("GET conversations error:", error);
 
@@ -105,7 +143,6 @@ return NextResponse.json({
     );
   }
 }
-
 export async function POST(req) {
   try {
     await dbConnect();
@@ -121,6 +158,18 @@ export async function POST(req) {
       });
 
       if (exists) {
+
+          await Conversation.updateOne(
+    { _id: exists._id },
+    {
+      $pull: {
+        hiddenFor: body?.currentUserId,
+      },
+      $set: {
+        updatedAt: new Date(),
+      },
+    }
+  );
         const populatedExists = await Conversation.findById(exists?._id)
          .populate("members", "name email avatar about isOnline lastSeen blockedUsers")
           .populate({
@@ -138,10 +187,11 @@ export async function POST(req) {
         });
       }
 
-      const conversation = await Conversation.create({
-        type: "direct",
-        members: [body?.currentUserId, body?.receiverId],
-      });
+const conversation = await Conversation.create({
+  type: "direct",
+  members: [body?.currentUserId, body?.receiverId],
+  createdBy: body?.currentUserId,
+});
 
       const populatedConversation = await Conversation.findById(
         conversation?._id

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "../../lib/db";
-import Call from "../../models/Call"; 
+import Call from "../../models/Call";
 import Conversation from "../../models/Conversation";
 
 export async function POST(req) {
@@ -9,26 +9,44 @@ export async function POST(req) {
 
     const { conversationId, callerId, type } = await req.json();
 
+    if (!conversationId || !callerId || !type) {
+      return NextResponse.json(
+        { success: false, error: "conversationId, callerId and type required" },
+        { status: 400 }
+      );
+    }
+
     const conversation = await Conversation.findById(conversationId).populate(
       "members",
       "_id name avatar"
     );
 
     if (!conversation) {
-      return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "Conversation not found" },
+        { status: 404 }
+      );
     }
 
     const receiver = conversation.members.find(
-      (member) => String(member._id) !== String(callerId)
+      (member) => member?._id?.toString() !== callerId?.toString()
     );
 
     const call = await Call.create({
       conversation: conversationId,
       caller: callerId,
-      receiver: receiver?._id,
-      members: conversation.members.map((m) => m._id),
+      receiver: receiver?._id || null,
+      members: conversation.members.map((member) => member._id),
+      hiddenFor: [],
       type,
       status: "ringing",
+    });
+
+    await Conversation.findByIdAndUpdate(conversationId, {
+      updatedAt: new Date(),
+      $pull: {
+        hiddenFor: { $in: conversation.members.map((member) => member._id) },
+      },
     });
 
     const populated = await Call.findById(call._id)
@@ -38,7 +56,12 @@ export async function POST(req) {
 
     return NextResponse.json({ success: true, call: populated });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Create call error:", error);
+
+    return NextResponse.json(
+      { success: false, error: error?.message || "Call create failed" },
+      { status: 500 }
+    );
   }
 }
 
@@ -69,24 +92,25 @@ export async function GET(req) {
       );
     }
 
-    if (mode === "ringing") {
-      const call = await Call.findOne({
-        members: userId,
-        caller: { $ne: userId },
-        status: "ringing",
-      })
-        .sort({ createdAt: -1 })
-        .populate("caller", "name avatar")
-        .populate("receiver", "name avatar")
-        .populate("conversation");
+if (mode === "ringing") {
+  const call = await Call.findOne({
+    members: userId,
+    caller: { $ne: userId },
+    status: "ringing",
+    hiddenFor: { $ne: userId },
+  })
+    .sort({ createdAt: -1 })
+    .populate("caller", "name avatar")
+    .populate("receiver", "name avatar")
+    .populate("conversation");
 
-      return NextResponse.json({ success: true, call });
-    }
+  return NextResponse.json({ success: true, call });
+}
 
-const callQuery = {
-  members: userId,
-  hiddenFor: { $ne: userId },
-};
+    const callQuery = {
+      members: userId,
+      hiddenFor: { $ne: userId },
+    };
 
     if (conversationId) {
       callQuery.conversation = conversationId;
@@ -99,12 +123,12 @@ const callQuery = {
       .populate("receiver", "name avatar")
       .populate("conversation");
 
- const missedCount = await Call.countDocuments({
-  members: userId,
-  caller: { $ne: userId },
-  status: "missed",
-  hiddenFor: { $ne: userId },
-});
+    const missedCount = await Call.countDocuments({
+      members: userId,
+      caller: { $ne: userId },
+      status: "missed",
+      hiddenFor: { $ne: userId },
+    });
 
     return NextResponse.json({
       success: true,
@@ -115,7 +139,7 @@ const callQuery = {
     console.error("Get calls error:", error);
 
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error?.message || "Calls fetch failed" },
       { status: 500 }
     );
   }
@@ -127,9 +151,19 @@ export async function PUT(req) {
 
     const { callId, status } = await req.json();
 
+    if (!callId || !status) {
+      return NextResponse.json(
+        { success: false, error: "callId and status required" },
+        { status: 400 }
+      );
+    }
+
     const update = { status };
 
-    if (status === "accepted") update.startedAt = new Date();
+    if (status === "accepted") {
+      update.startedAt = new Date();
+    }
+
     if (["ended", "rejected", "missed", "cancelled"].includes(status)) {
       update.endedAt = new Date();
     }
@@ -143,7 +177,12 @@ export async function PUT(req) {
 
     return NextResponse.json({ success: true, call });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Update call error:", error);
+
+    return NextResponse.json(
+      { success: false, error: error?.message || "Call update failed" },
+      { status: 500 }
+    );
   }
 }
 
@@ -162,12 +201,18 @@ export async function DELETE(req) {
       );
     }
 
-    const deletedCall = await Call.findOneAndDelete({
-      _id: callId,
-      $or: [{ caller: userId }, { receiver: userId }],
-    });
+    const call = await Call.findOneAndUpdate(
+      {
+        _id: callId,
+        members: userId,
+      },
+      {
+        $addToSet: { hiddenFor: userId },
+      },
+      { new: true }
+    );
 
-    if (!deletedCall) {
+    if (!call) {
       return NextResponse.json(
         { success: false, error: "Call not found" },
         { status: 404 }
@@ -176,12 +221,13 @@ export async function DELETE(req) {
 
     return NextResponse.json({
       success: true,
-      message: "Call deleted successfully",
+      message: "Call deleted for you",
     });
   } catch (error) {
     console.error("Delete call error:", error);
+
     return NextResponse.json(
-      { success: false, error: "Delete call failed" },
+      { success: false, error: error?.message || "Delete call failed" },
       { status: 500 }
     );
   }

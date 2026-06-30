@@ -344,29 +344,39 @@ function ChatInfoContent() {
     setConversation(result.conversation);
     return result;
   }
-  async function clearChat() {
-    const ok = confirm(
-      isGroup ? "Clear group messages for you?" : "Clear this chat for you?",
-    );
-    if (!ok) return;
+async function clearChat() {
+  const ok = confirm(
+    isGroup
+      ? "Clear group messages and calls for you?"
+      : "Clear messages and calls for you?",
+  );
 
-    const token = localStorage.getItem("token");
+  if (!ok) return;
 
-    await fetch(
-      `/api/conversations?conversationId=${conversationId}&userId=${currentUser?._id}`,
-      {
-        method: "DELETE",
-        headers: { Authorization: token ? `Bearer ${token}` : "" },
-      },
-    );
+  const token = localStorage.getItem("token");
 
-    if (isGroup) {
-      setMessages([]);
-      return;
-    }
+  const res = await fetch("/api/conversations/clear-chat", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+    body: JSON.stringify({
+      conversationId,
+      userId: currentUser?._id,
+    }),
+  });
 
-    router.replace("/chat");
+  const result = await res.json().catch(() => null);
+
+  if (!res.ok || !result?.success) {
+    alert(result?.error || "Clear chat failed");
+    return;
   }
+
+setMessages([]);
+router.replace(`/chat?conversationId=${conversationId}&cleared=${Date.now()}`);
+}
 
   async function blockUser() {
     if (!currentUser?._id || !otherPerson?._id) return;

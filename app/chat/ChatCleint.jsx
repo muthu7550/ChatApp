@@ -8,6 +8,7 @@ import IncomingCallWatcher from "../components/IncomingCallWatcher";
 import IncomingMessageWatcher from "../components/IncomingMessageWatcher";
 import PushNotificationRegister from "../components/PushNotificationRegister";
 import { requestNotificationPermission } from "../lib/notifyClient";
+import { useRouter } from "next/navigation";
 
 export default function ChatClient() {
   const searchParams = useSearchParams();
@@ -17,6 +18,7 @@ export default function ChatClient() {
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [pageLoading, setPageLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     function setAppHeight() {
@@ -180,11 +182,12 @@ requestNotificationPermission();
         <ChatWindow
           currentUser={currentUser}
           conversation={selectedConversation}
-          onBack={() => {
-            setSelectedConversation(null);
-            setMobileChatOpen(false);
-            window.history.pushState(null, "", "/chat");
-          }}
+         onBack={() => {
+  setSelectedConversation(null);
+  setMobileChatOpen(false);
+  router.replace("/chat");
+  setRefreshKey((prev) => prev + 1);
+}}
           onRefreshConversations={() => setRefreshKey((prev) => prev + 1)}
         />
       </div>

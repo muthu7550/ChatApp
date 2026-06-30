@@ -24,7 +24,8 @@ export default function ChatWindow({
   const router = useRouter();
   const searchParams = useSearchParams();
   const conversationIdFromUrl = searchParams.get("conversationId");
-
+  const clearedKeyFromUrl = searchParams.get("cleared");
+  const callRefreshKey = searchParams.get("callRefresh");
   const chatBodyRef = useRef(null);
   const messageListRef = useRef(null);
   const loadedConversationRef = useRef(null);
@@ -32,7 +33,7 @@ export default function ChatWindow({
   const pendingMessagesRef = useRef([]);
   const bottomLockTimerRef = useRef(null);
   const hasInitialScrolledRef = useRef(false);
-const isUserNearBottomRef = useRef(true);
+  const isUserNearBottomRef = useRef(true);
 
   const [activeConversation, setActiveConversation] = useState(
     conversation || null,
@@ -60,6 +61,22 @@ const isUserNearBottomRef = useRef(true);
   }, [conversation?._id]);
 
   useEffect(() => {
+    if (!clearedKeyFromUrl) return;
+
+    setMessages([]);
+    setChatCalls([]);
+    fetchMessages(false);
+    fetchChatCalls();
+  }, [clearedKeyFromUrl]);
+
+  useEffect(() => {
+    if (!callRefreshKey) return;
+
+    fetchChatCalls();
+    onRefreshConversations?.();
+  }, [callRefreshKey]);
+
+  useEffect(() => {
     if (!conversationIdFromUrl) {
       setActiveConversation(null);
       setMessages([]);
@@ -84,10 +101,10 @@ const isUserNearBottomRef = useRef(true);
           setIsPreparingReveal(false);
         }
 
-        const res = await fetch(
-          `/api/conversations?userId=${currentUser._id}`,
-          { headers: authHeaders },
-        );
+const res = await fetch(
+  `/api/conversations?userId=${currentUser._id}&conversationId=${conversationIdFromUrl}`,
+  { headers: authHeaders },
+);
 
         if (!res.ok || cancelled) return;
 
@@ -125,7 +142,7 @@ const isUserNearBottomRef = useRef(true);
     loadedConversationRef.current = activeConversation._id;
     pendingMessagesRef.current = [];
     hasInitialScrolledRef.current = false;
-isUserNearBottomRef.current = true;
+    isUserNearBottomRef.current = true;
 
     setMessages([]);
     setShowRealChat(false);
@@ -193,15 +210,15 @@ isUserNearBottomRef.current = true;
 
       if (initialLoad) {
         pendingMessagesRef.current = nextMessages;
-    } else {
-  const shouldAutoScroll = isUserNearBottomRef.current;
+      } else {
+        const shouldAutoScroll = isUserNearBottomRef.current;
 
-  setMessages(nextMessages);
+        setMessages(nextMessages);
 
-  if (shouldAutoScroll) {
-    requestAnimationFrame(() => scrollToBottomHard());
-  }
-} 
+        if (shouldAutoScroll) {
+          requestAnimationFrame(() => scrollToBottomHard());
+        }
+      }
     } catch (error) {
       console.error("Fetch messages error:", error);
     } finally {
@@ -246,18 +263,29 @@ isUserNearBottomRef.current = true;
 
     try {
       const res = await fetch(
-        `/api/calls?userId=${currentUser._id}&conversationId=${activeConversation._id}`,
-        { headers: authHeaders },
+        `/api/calls?userId=${currentUser._id}&conversationId=${activeConversation._id}&t=${Date.now()}`,
+        {
+          headers: {
+            ...authHeaders,
+            "Cache-Control": "no-store",
+          },
+          cache: "no-store",
+        },
       );
 
-      const result = await res.json();
+      const result = await res.json().catch(() => null);
+
+      if (!res.ok || !result?.success) {
+        setChatCalls([]);
+        return;
+      }
+
       setChatCalls(result?.calls || []);
     } catch (error) {
       console.error("Fetch chat calls error:", error);
       setChatCalls([]);
     }
   }
-
   async function markActiveChatAsRead() {
     if (!activeConversation?._id || !currentUser?._id) return;
 
@@ -290,16 +318,16 @@ isUserNearBottomRef.current = true;
     }
 
     requestAnimationFrame(() => {
-     if (!hasInitialScrolledRef.current) {
-  scrollToBottomHard();
-  hasInitialScrolledRef.current = true;
-}
+      if (!hasInitialScrolledRef.current) {
+        scrollToBottomHard();
+        hasInitialScrolledRef.current = true;
+      }
 
       requestAnimationFrame(() => {
-       if (!hasInitialScrolledRef.current) {
-  scrollToBottomHard();
-  hasInitialScrolledRef.current = true;
-}
+        if (!hasInitialScrolledRef.current) {
+          scrollToBottomHard();
+          hasInitialScrolledRef.current = true;
+        }
 
         setShowRealChat(true);
         setIsPreparingReveal(false);
@@ -309,24 +337,24 @@ isUserNearBottomRef.current = true;
     });
   }, [isPreparingReveal, messages.length]);
 
-useEffect(() => {
-  if (!showRealChat) return;
-  if (!chatBodyRef.current) return;
+  useEffect(() => {
+    if (!showRealChat) return;
+    if (!chatBodyRef.current) return;
 
-  const body = chatBodyRef.current;
+    const body = chatBodyRef.current;
 
-  const observer = new ResizeObserver(() => {
-    if (isUserNearBottomRef.current) {
-      scrollToBottomHard();
+    const observer = new ResizeObserver(() => {
+      if (isUserNearBottomRef.current) {
+        scrollToBottomHard();
+      }
+    });
+
+    if (messageListRef.current) {
+      observer.observe(messageListRef.current);
     }
-  });
 
-  if (messageListRef.current) {
-    observer.observe(messageListRef.current);
-  }
-
-  return () => observer.disconnect();
-}, [showRealChat, activeConversation?._id]);
+    return () => observer.disconnect();
+  }, [showRealChat, activeConversation?._id]);
 
   function lockBottomForAWhile() {
     if (bottomLockTimerRef.current) {
@@ -345,22 +373,22 @@ useEffect(() => {
     }, 80);
   }
 
-function isNearBottom() {
-  const body = chatBodyRef.current;
-  if (!body) return true;
+  function isNearBottom() {
+    const body = chatBodyRef.current;
+    if (!body) return true;
 
-  const distanceFromBottom =
-    body.scrollHeight - body.scrollTop - body.clientHeight;
+    const distanceFromBottom =
+      body.scrollHeight - body.scrollTop - body.clientHeight;
 
-  return distanceFromBottom < 120;
-}
+    return distanceFromBottom < 120;
+  }
 
-function scrollToBottomHard() {
-  const body = chatBodyRef.current;
-  if (!body) return;
+  function scrollToBottomHard() {
+    const body = chatBodyRef.current;
+    if (!body) return;
 
-  body.scrollTop = body.scrollHeight;
-}
+    body.scrollTop = body.scrollHeight;
+  }
 
   async function sendMessage(payload = {}) {
     const token = localStorage.getItem("token");
@@ -448,7 +476,11 @@ Chat Restricted: ${isChatRestricted}
       }, 100);
 
       setShowRealChat(true);
-      onRefreshConversations?.();
+   onRefreshConversations?.();
+
+setTimeout(() => {
+  onRefreshConversations?.();
+}, 700);
 
       setTimeout(() => {
         scrollToBottomHard();
@@ -488,6 +520,7 @@ Sender: ${currentUser?._id || "Missing"}
 
     const interval = setInterval(() => {
       fetchMessages(false);
+      fetchChatCalls();
     }, 2000);
 
     return () => clearInterval(interval);
@@ -834,13 +867,13 @@ Sender: ${currentUser?._id || "Missing"}
 
       {renderHeader()}
 
-<section
-  ref={chatBodyRef}
-  onScroll={() => {
-    isUserNearBottomRef.current = isNearBottom();
-  }}
-  className="chat-body flex-grow-1 min-h-0 overflow-auto"
->
+      <section
+        ref={chatBodyRef}
+        onScroll={() => {
+          isUserNearBottomRef.current = isNearBottom();
+        }}
+        className="chat-body flex-grow-1 min-h-0 overflow-auto"
+      >
         {!isChatRestricted && chatTimeline.length > 0 && (
           <div
             ref={messageListRef}

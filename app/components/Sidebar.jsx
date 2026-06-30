@@ -53,12 +53,12 @@ export default function Sidebar({
   const profileMenuRef = useRef(null);
   const chatMenuRef = useRef(null);
   const conversationFetchRunningRef = useRef(false);
-const usersFetchRunningRef = useRef(false);
-const callsFetchRunningRef = useRef(false);
+  const usersFetchRunningRef = useRef(false);
+  const callsFetchRunningRef = useRef(false);
 
-const [conversationsFetched, setConversationsFetched] = useState(false);
-const [usersFetched, setUsersFetched] = useState(false);
-const [callsFetched, setCallsFetched] = useState(false);
+  const [conversationsFetched, setConversationsFetched] = useState(false);
+  const [usersFetched, setUsersFetched] = useState(false);
+  const [callsFetched, setCallsFetched] = useState(false);
 
   const orangeGradient = "linear-gradient(135deg, #ff9d2e, #ff5b2f)";
 
@@ -138,9 +138,9 @@ const [callsFetched, setCallsFetched] = useState(false);
   useEffect(() => {
     if (!currentUser?._id) return;
 
-fetchConversations(!conversationsFetched);
-fetchUsers("", !usersFetched);
-fetchCalls();
+    fetchConversations(!conversationsFetched);
+    fetchUsers("", !usersFetched);
+    fetchCalls();
 
     const interval = setInterval(() => {
       fetchConversations(false);
@@ -189,151 +189,162 @@ fetchCalls();
     };
   }, []);
 
-async function fetchConversations(showLoader = false) {
-  if (!currentUser?._id || conversationFetchRunningRef.current) return;
+  async function fetchConversations(showLoader = false) {
+    if (!currentUser?._id || conversationFetchRunningRef.current) return;
+
+    try {
+      conversationFetchRunningRef.current = true;
+
+      if (showLoader && !conversationsFetched) {
+        setConversationsLoading(true);
+      }
+
+  const res = await fetch(
+`/api/conversations?userId=${currentUser._id}&conversationId=${selectedConversation?._id || ""}&t=${Date.now()}`,
+  {
+    headers: {
+      ...getAuthHeaders(),
+      "Cache-Control": "no-store",
+    },
+    cache: "no-store",
+  }
+);
+
+      if (await handleUnauthorized(res)) return;
+
+      const result = await res.json().catch(() => null);
+
+      if (result?.success) {
+        setConversations(result?.conversations || []);
+      }
+    } catch (error) {
+      console.error("Fetch conversations error:", error);
+    } finally {
+      setConversationsFetched(true);
+      setConversationsLoading(false);
+      conversationFetchRunningRef.current = false;
+    }
+  }
+
+  async function fetchUsers(searchText = "", showLoader = false) {
+    if (!currentUser?._id || usersFetchRunningRef.current) return;
+
+    try {
+      usersFetchRunningRef.current = true;
+
+      if (showLoader && !usersFetched) {
+        setUsersLoading(true);
+      }
+
+      const res = await fetch(
+        `/api/users?userId=${currentUser._id}&search=${encodeURIComponent(searchText)}`,
+        {
+          headers: getAuthHeaders(),
+        },
+      );
+
+      if (await handleUnauthorized(res)) return;
+
+      const result = await res.json().catch(() => null);
+
+      if (result?.success || result?.users) {
+        setUsers(result?.users || []);
+      }
+    } catch (error) {
+      console.error("Fetch users error:", error);
+    } finally {
+      setUsersFetched(true);
+      setUsersLoading(false);
+      usersFetchRunningRef.current = false;
+    }
+  }
+
+async function startDirectChat(receiverId) {
+  const token = localStorage.getItem("token");
 
   try {
-    conversationFetchRunningRef.current = true;
-
-    if (showLoader && !conversationsFetched) {
-      setConversationsLoading(true);
-    }
-
-    const res = await fetch(`/api/conversations?userId=${currentUser._id}`, {
-      headers: getAuthHeaders(),
+    const res = await fetch("/api/conversations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+      body: JSON.stringify({
+        type: "direct",
+        currentUserId: currentUser?._id,
+        receiverId,
+      }),
     });
 
     if (await handleUnauthorized(res)) return;
 
-    const result = await res.json().catch(() => null);
+    const result = await res.json();
 
-    if (result?.success) {
-      setConversations(result?.conversations || []);
-    }
-  } catch (error) {
-    console.error("Fetch conversations error:", error);
-  } finally {
-    setConversationsFetched(true);
-    setConversationsLoading(false);
-    conversationFetchRunningRef.current = false;
-  }
-}
-
-async function fetchUsers(searchText = "", showLoader = false) {
-  if (!currentUser?._id || usersFetchRunningRef.current) return;
-
-  try {
-    usersFetchRunningRef.current = true;
-
-    if (showLoader && !usersFetched) {
-      setUsersLoading(true);
+    if (!res.ok || !result?.success) {
+      alert(result?.error || "Chat create failed");
+      return;
     }
 
-    const res = await fetch(
-      `/api/users?userId=${currentUser._id}&search=${encodeURIComponent(searchText)}`,
-      {
-        headers: getAuthHeaders(),
+    setShowNetwork(false);
+    setSearch("");
+
+    const safeConversation = {
+      ...result.conversation,
+      lastMessage: null,
+      unreadCount: 0,
+    };
+
+    setConversations((prev) => {
+      const exists = prev.some(
+        (item) => item?._id === safeConversation?._id,
+      );
+
+      if (exists) {
+        return prev.map((item) =>
+          item?._id === safeConversation?._id ? safeConversation : item,
+        );
       }
-    );
 
-    if (await handleUnauthorized(res)) return;
+      return [safeConversation, ...prev];
+    });
 
-    const result = await res.json().catch(() => null);
+    onSelectConversation(safeConversation);
+    setMobileChatOpen?.(true);
+    router.push(`/chat?conversationId=${safeConversation?._id}`);
+    onRefresh?.();
 
-    if (result?.success || result?.users) {
-      setUsers(result?.users || []);
-    }
+    setTimeout(() => {
+      fetchConversations(false);
+    }, 300);
   } catch (error) {
-    console.error("Fetch users error:", error);
-  } finally {
-    setUsersFetched(true);
-    setUsersLoading(false);
-    usersFetchRunningRef.current = false;
+    console.error("Start direct chat error:", error);
+    alert("Something went wrong");
   }
 }
 
-  async function startDirectChat(receiverId) {
-    const token = localStorage.getItem("token");
+  async function fetchCalls() {
+    if (!currentUser?._id || callsFetchRunningRef.current) return;
 
     try {
-      const res = await fetch("/api/conversations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-        body: JSON.stringify({
-          type: "direct",
-          currentUserId: currentUser?._id,
-          receiverId,
-        }),
+      callsFetchRunningRef.current = true;
+
+      const res = await fetch(`/api/calls?userId=${currentUser._id}`, {
+        headers: getAuthHeaders(),
       });
 
       if (await handleUnauthorized(res)) return;
 
-      const result = await res.json();
+      const result = await res.json().catch(() => null);
 
-      if (!res.ok || !result?.success) {
-        alert(result?.error || "Chat create failed");
-        return;
-      }
-
-      setShowNetwork(false);
-      setSearch("");
-
-      setConversations((prev) => {
-        const exists = prev.some(
-          (item) => item?._id === result?.conversation?._id,
-        );
-
-        if (exists) {
-          return prev.map((item) =>
-            item?._id === result?.conversation?._id
-              ? result?.conversation
-              : item,
-          );
-        }
-
-        return [result?.conversation, ...prev];
-      });
-
-      onSelectConversation(result?.conversation);
-      setMobileChatOpen?.(true);
-      router.push(`/chat?conversationId=${result?.conversation?._id}`);
-      onRefresh?.();
-
-      setTimeout(() => {
-        fetchConversations(false);
-      }, 300);
+      setCalls(result?.calls || []);
+      setMissedCallCount(result?.missedCount || 0);
     } catch (error) {
-      console.error("Start direct chat error:", error);
-      alert("Something went wrong");
+      console.error("Fetch calls error:", error);
+    } finally {
+      setCallsFetched(true);
+      callsFetchRunningRef.current = false;
     }
   }
-
-async function fetchCalls() {
-  if (!currentUser?._id || callsFetchRunningRef.current) return;
-
-  try {
-    callsFetchRunningRef.current = true;
-
-    const res = await fetch(`/api/calls?userId=${currentUser._id}`, {
-      headers: getAuthHeaders(),
-    });
-
-    if (await handleUnauthorized(res)) return;
-
-    const result = await res.json().catch(() => null);
-
-    setCalls(result?.calls || []);
-    setMissedCallCount(result?.missedCount || 0);
-  } catch (error) {
-    console.error("Fetch calls error:", error);
-  } finally {
-    setCallsFetched(true);
-    callsFetchRunningRef.current = false;
-  }
-}
 
   async function startCallFromNetwork(receiverId, type) {
     const token = localStorage.getItem("token");
@@ -381,52 +392,68 @@ async function fetchCalls() {
     }
   }
 
-  async function deleteConversation(conversationId) {
-    const isGroup =
-      conversations.find((item) => item?._id === conversationId)?.type ===
-      "group";
+async function deleteConversation(conversationId) {
+  const conversation = conversations.find(
+    (item) => item?._id === conversationId,
+  );
 
-    const ok = confirm(isGroup ? "Leave this group?" : "Delete this chat?");
-    if (!ok) return;
+  const isGroup = conversation?.type === "group";
 
-    const res = await fetch(
-      `/api/conversations?conversationId=${conversationId}&userId=${currentUser?._id}`,
-      {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      },
-    );
+  const ok = confirm(isGroup ? "Leave this group?" : "Delete this chat?");
+  if (!ok) return;
 
-    if (await handleUnauthorized(res)) return;
+  const token = localStorage.getItem("token");
 
-    const result = await res.json();
-
-    if (result?.success) {
-      // Remove conversation immediately from sidebar
-      setConversations((prev) =>
-        prev.filter((item) => item?._id !== conversationId),
-      );
-
-      // Remove related calls immediately from Calls tab
-      setCalls((prev) =>
-        prev.filter((call) => {
-          const callConversationId =
-            call?.conversation?._id || call?.conversation;
-
-          return callConversationId !== conversationId;
+  const res = isGroup
+    ? await fetch("/api/groups", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({
+          conversationId,
+          userId: currentUser?._id,
+          action: "leave_group",
         }),
+      })
+    : await fetch(
+        `/api/conversations?conversationId=${conversationId}&userId=${currentUser?._id}`,
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        },
       );
 
-      onRefresh?.();
-      onSelectConversation(null);
-      setMobileChatOpen?.(false);
-      router.push("/chat");
+  if (await handleUnauthorized(res)) return;
 
-      // Refresh from server
-      fetchConversations(false);
-      fetchCalls();
-    }
+  const result = await res.json().catch(() => null);
+
+  if (!res.ok || !result?.success) {
+    alert(result?.error || (isGroup ? "Leave group failed" : "Delete chat failed"));
+    return;
   }
+
+  setConversations((prev) =>
+    prev.filter((item) => item?._id !== conversationId),
+  );
+
+  setCalls((prev) =>
+    prev.filter((call) => {
+      const callConversationId = call?.conversation?._id || call?.conversation;
+      return callConversationId !== conversationId;
+    }),
+  );
+
+  setOpenChatMenuId(null);
+  onRefresh?.();
+  onSelectConversation(null);
+  setMobileChatOpen?.(false);
+  router.replace("/chat");
+
+  fetchConversations(false);
+  fetchCalls();
+}
 
   async function clearConversationsByType(type) {
     const label = type === "group" ? "groups" : "chats";
@@ -628,10 +655,21 @@ async function fetchCalls() {
       conversation?.lastMessage?.sender?._id ||
       conversation?.lastMessage?.sender;
 
-    const lastMessageText =
-      lastSenderId === currentUser?._id
+const hasVisibleLastMessage = Boolean(conversation?.lastMessage);
+
+const wasClearedOrDeleted =
+  conversation?.clearedFor?.some?.(
+    (item) => item?.user?.toString() === currentUser?._id?.toString()
+  ) || false;
+
+const lastMessageText =
+  wasClearedOrDeleted && !hasVisibleLastMessage
+    ? "No messages yet"
+    : !hasVisibleLastMessage
+      ? "No messages yet"
+      : lastSenderId === currentUser?._id
         ? `You: ${conversation?.lastMessage?.text || "File"}`
-        : conversation?.lastMessage?.text || "No messages yet";
+        : conversation?.lastMessage?.text || "File";
 
     return (
       <div
@@ -664,8 +702,6 @@ async function fetchCalls() {
             </div>
           </div>
 
-
-
           {conversation?.unreadCount > 0 && (
             <span
               className="text-white rounded-circle d-flex align-items-center justify-content-center fw-bold ms-2"
@@ -683,19 +719,19 @@ async function fetchCalls() {
           )}
 
           {conversation?.type === "group" &&
-  conversation?.pendingJoinCount > 0 && (
-    <span
-      className="text-white rounded-pill d-flex align-items-center justify-content-center fw-bold ms-2 px-2"
-      style={{
-        minWidth: 24,
-        height: 24,
-        fontSize: 11,
-        background: "#f97316",
-      }}
-    >
-      {conversation.pendingJoinCount} req
-    </span>
-  )}
+            conversation?.pendingJoinCount > 0 && (
+              <span
+                className="text-white rounded-pill d-flex align-items-center justify-content-center fw-bold ms-2 px-2"
+                style={{
+                  minWidth: 24,
+                  height: 24,
+                  fontSize: 11,
+                  background: "#f97316",
+                }}
+              >
+                {conversation.pendingJoinCount} req
+              </span>
+            )}
         </button>
 
         <div
@@ -737,9 +773,11 @@ async function fetchCalls() {
                 ) : (
                   <>
                     <FaTrashAlt size={14} />
-                   <span className="small fw-semibold">
-  {conversation?.type === "group" ? "Leave group" : "Delete chat"}
-</span>
+                    <span className="small fw-semibold">
+                      {conversation?.type === "group"
+                        ? "Leave group"
+                        : "Delete chat"}
+                    </span>
                   </>
                 )}
               </button>
@@ -1303,9 +1341,9 @@ async function fetchCalls() {
               </span>
             </div>
 
-           {!callsFetched ? (
-  <SidebarSkeleton count={4} />
-) : calls.length > 0 ? (
+            {!callsFetched ? (
+              <SidebarSkeleton count={4} />
+            ) : calls.length > 0 ? (
               calls.map((call) => {
                 const isOutgoing = call?.caller?._id === currentUser?._id;
                 const person = isOutgoing ? call?.receiver : call?.caller;
@@ -1446,10 +1484,10 @@ async function fetchCalls() {
                 onToggle={() => setGroupsOpen((prev) => !prev)}
                 actionIcon={<FaPlus />}
                 onAction={() => setShowGroup(true)}
-               clearIcon={null}
-onClear={null}
+                clearIcon={null}
+                onClear={null}
               >
-               {!conversationsFetched || conversationsLoading ? (
+                {!conversationsFetched || conversationsLoading ? (
                   <SidebarSkeleton count={3} />
                 ) : groupChats.length > 0 ? (
                   groupChats.map((conversation) =>
@@ -1486,7 +1524,7 @@ onClear={null}
                 clearIcon={privateChats.length > 0 ? <FaTrashAlt /> : null}
                 onClear={() => clearConversationsByType("direct")}
               >
-               {!conversationsFetched || conversationsLoading ? (
+                {!conversationsFetched || conversationsLoading ? (
                   <SidebarSkeleton count={5} />
                 ) : privateChats.length > 0 ? (
                   privateChats.map((conversation) =>

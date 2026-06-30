@@ -64,9 +64,8 @@ export default function CallClient() {
         status: "missed",
       }),
     });
-
-    setToken("");
-    setError("Call missed");
+setToken("");
+router.replace(`${backToChatUrl}&callRefresh=${Date.now()}`);
   }, 30000);
 
   return () => clearTimeout(timer);
@@ -106,23 +105,23 @@ export default function CallClient() {
           return;
         }
 
-        if (latestCall.status === "rejected") {
-          setToken("");
-          setError("Call rejected");
-          return;
-        }
+   if (latestCall.status === "rejected") {
+  setToken("");
+  router.replace(`${backToChatUrl}&callRefresh=${Date.now()}`);
+  return;
+}
 
-        if (latestCall.status === "missed") {
-          setToken("");
-          setError("Call missed");
-          return;
-        }
+if (latestCall.status === "missed") {
+  setToken("");
+  router.replace(`${backToChatUrl}&callRefresh=${Date.now()}`);
+  return;
+}
 
-        if (latestCall.status === "cancelled") {
-          setToken("");
-          setError("Call cancelled");
-          return;
-        }
+if (latestCall.status === "cancelled") {
+  setToken("");
+  router.replace(`${backToChatUrl}&callRefresh=${Date.now()}`);
+  return;
+}
 
         if (latestCall.status === "ended") {
           router.replace(backToChatUrl);
@@ -198,7 +197,7 @@ export default function CallClient() {
         });
       }
     } finally {
-      router.replace(backToChatUrl);
+      router.replace(`${backToChatUrl}&callRefresh=${Date.now()}`);
     }
   }
 

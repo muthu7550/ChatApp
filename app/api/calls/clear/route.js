@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import {dbConnect} from "../../../lib/db";
+import { dbConnect } from "../../../lib/db";
 import Call from "../../../models/Call";
 
 export async function DELETE(req) {
@@ -16,16 +16,22 @@ export async function DELETE(req) {
       );
     }
 
-    await Call.deleteMany({
-      $or: [{ caller: userId }, { receiver: userId }],
-    });
+    await Call.updateMany(
+      {
+        members: userId,
+      },
+      {
+        $addToSet: { hiddenFor: userId },
+      }
+    );
 
     return NextResponse.json({
       success: true,
-      message: "Calls cleared successfully",
+      message: "Calls cleared for you",
     });
   } catch (error) {
     console.error("Clear calls error:", error);
+
     return NextResponse.json(
       { success: false, error: "Clear calls failed" },
       { status: 500 }

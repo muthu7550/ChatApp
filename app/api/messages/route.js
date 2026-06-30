@@ -29,11 +29,14 @@ export async function GET(req) {
       return NextResponse.json({ success: true, messages: [] });
     }
 
-    const clearedData = conversation.clearedFor?.find(
-      (item) => item?.user?.toString() === userId
+    const clearedData = conversation?.clearedFor?.find(
+      (item) => item?.user?.toString() === userId?.toString()
     );
 
-    const messageQuery = { conversation: conversationId };
+    const messageQuery = {
+      conversation: conversationId,
+      deletedFor: { $ne: userId },
+    };
 
     if (clearedData?.clearedAt) {
       messageQuery.createdAt = { $gt: clearedData.clearedAt };
@@ -46,6 +49,7 @@ export async function GET(req) {
     return NextResponse.json({ success: true, messages });
   } catch (error) {
     console.error("GET messages error:", error);
+
     return NextResponse.json(
       { success: false, error: error?.message || "Messages fetch failed" },
       { status: 500 }
@@ -99,23 +103,26 @@ export async function POST(req) {
       attachments: body?.attachments || [],
       location: body?.location || null,
       seenBy: [senderId],
+      deletedFor: [],
     });
 
-    await Conversation.findByIdAndUpdate(conversationId, {
+await Conversation.updateOne(
+  { _id: conversationId },
+  {
+    $set: {
       lastMessage: message._id,
       updatedAt: new Date(),
-      $pull: {
-        hiddenFor: senderId,
-      },
-    });
+    },
+    $pull: {
+      hiddenFor: { $in: conversation.members },
+    },
+  }
+);
 
     const populatedMessage = await Message.findById(message._id).populate(
       "sender",
       "name avatar"
     );
-
-    // Push notification removed from this route because Firebase Admin import crashes Vercel.
-    // Add push later through a separate API/background route.
 
     return NextResponse.json({
       success: true,
@@ -123,6 +130,7 @@ export async function POST(req) {
     });
   } catch (error) {
     console.error("POST messages error:", error);
+
     return NextResponse.json(
       { success: false, error: error?.message || "Message create failed" },
       { status: 500 }
@@ -136,6 +144,7 @@ export async function DELETE(req) {
 
     const { searchParams } = new URL(req.url);
     const conversationId = searchParams.get("conversationId");
+    const userId = searchParams.get("userId");
 
     if (!conversationId) {
       return NextResponse.json(
@@ -144,11 +153,27 @@ export async function DELETE(req) {
       );
     }
 
+    if (userId) {
+      await Message.updateMany(
+        { conversation: conversationId },
+        { $addToSet: { deletedFor: userId } }
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: "Messages deleted for you",
+      });
+    }
+
     await Message.deleteMany({ conversation: conversationId });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      message: "Messages deleted permanently",
+    });
   } catch (error) {
     console.error("DELETE messages error:", error);
+
     return NextResponse.json(
       { success: false, error: error?.message || "Messages delete failed" },
       { status: 500 }

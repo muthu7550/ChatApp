@@ -7,37 +7,44 @@ const callSchema = new mongoose.Schema(
       ref: "Conversation",
       required: true,
     },
+
     caller: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+
     receiver: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-    hiddenFor: [
-  {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-],
+
     members: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
+
+    hiddenFor: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
     type: {
       type: String,
       enum: ["audio", "video"],
       required: true,
     },
+
     status: {
       type: String,
       enum: ["ringing", "accepted", "rejected", "missed", "ended", "cancelled"],
       default: "ringing",
     },
+
     startedAt: Date,
     endedAt: Date,
   },
