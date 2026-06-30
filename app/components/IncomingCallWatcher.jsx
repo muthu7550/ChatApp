@@ -160,7 +160,7 @@ export default function IncomingCallWatcher({ currentUser, incomingCallId }) {
 
     pollCall();
 
-    const interval = setInterval(pollCall, 1500);
+    const interval = setInterval(pollCall, 500);
 
     return () => {
       cancelled = true;
