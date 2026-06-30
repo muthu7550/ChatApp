@@ -3,7 +3,16 @@ import { dbConnect } from "../../../../lib/db";
 import User from "../../../../models/User";
 import { createToken } from "../../../../lib/jwt";
 
+function getAppUrl() {
+  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(
+    /\/$/,
+    ""
+  );
+}
+
 export async function GET(req) {
+  const APP_URL = getAppUrl();
+
   try {
     await dbConnect();
 
@@ -12,7 +21,7 @@ export async function GET(req) {
 
     if (!code) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/auth/login?error=github_code_missing`
+        `${APP_URL}/auth/login?error=github_code_missing`
       );
     }
 
@@ -26,7 +35,7 @@ export async function GET(req) {
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
         code,
-        redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/github/callback`,
+        redirect_uri: `${APP_URL}/api/auth/github/callback`,
       }),
     });
 
@@ -35,7 +44,7 @@ export async function GET(req) {
     if (!tokenRes.ok || !tokenData?.access_token) {
       console.error("GITHUB TOKEN ERROR:", tokenData);
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/auth/login?error=github_token_failed`
+        `${APP_URL}/auth/login?error=github_token_failed`
       );
     }
 
@@ -65,7 +74,7 @@ export async function GET(req) {
 
     if (!email) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/auth/login?error=github_email_missing`
+        `${APP_URL}/auth/login?error=github_email_missing`
       );
     }
 
@@ -92,27 +101,23 @@ export async function GET(req) {
       email: user.email,
     });
 
-    const redirectUrl = new URL(`${process.env.NEXT_PUBLIC_APP_URL}/auth/oauth-success`);
+    const redirectUrl = new URL(`${APP_URL}/auth/oauth-success`);
     redirectUrl.searchParams.set("token", token);
     redirectUrl.searchParams.set(
       "user",
-      encodeURIComponent(
-        JSON.stringify({
-          _id: user._id,
-          name: user.name,
-          email: user.email,
-          avatar: user.avatar || "",
-          about: user.about || "",
-          blockedUsers: user.blockedUsers || [],
-        })
-      )
+      JSON.stringify({
+        _id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar || "",
+        about: user.about || "",
+        blockedUsers: user.blockedUsers || [],
+      })
     );
 
     return NextResponse.redirect(redirectUrl);
   } catch (error) {
     console.error("GITHUB CALLBACK ERROR:", error);
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/auth/login?error=github_failed`
-    );
+    return NextResponse.redirect(`${APP_URL}/auth/login?error=github_failed`);
   }
 }
