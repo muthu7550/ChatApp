@@ -144,7 +144,7 @@ export default function Sidebar({
 
     const interval = setInterval(() => {
       fetchConversations(false);
-    }, 5000);
+    }, 10000);
 
     const callInterval = setInterval(() => {
       fetchCalls();

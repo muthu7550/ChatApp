@@ -204,7 +204,6 @@ const res = await fetch(
       }
 
       const nextMessages = result?.messages || [];
-      markActiveChatAsRead();
 
       if (loadedConversationRef.current !== conversationId) return;
 
@@ -233,6 +232,12 @@ const res = await fetch(
       }
     }
   }
+
+  useEffect(() => {
+  if (!activeConversation?._id || !currentUser?._id) return;
+
+  markActiveChatAsRead();
+}, [activeConversation?._id, currentUser?._id]);
 
   const otherPerson = activeConversation?.members?.find(
     (member) => member?._id !== currentUser?._id,
@@ -286,27 +291,25 @@ const res = await fetch(
       setChatCalls([]);
     }
   }
-  async function markActiveChatAsRead() {
-    if (!activeConversation?._id || !currentUser?._id) return;
+async function markActiveChatAsRead() {
+  if (!activeConversation?._id || !currentUser?._id) return;
 
-    try {
-      await fetch("/api/messages/read", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders,
-        },
-        body: JSON.stringify({
-          conversationId: activeConversation._id,
-          userId: currentUser._id,
-        }),
-      });
-
-      onRefreshConversations?.();
-    } catch (error) {
-      console.error("Mark read error:", error);
-    }
+  try {
+    await fetch("/api/messages/read", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+      body: JSON.stringify({
+        conversationId: activeConversation._id,
+        userId: currentUser._id,
+      }),
+    });
+  } catch (error) {
+    console.error("Mark read error:", error);
   }
+}
 
   useLayoutEffect(() => {
     if (!isPreparingReveal) return;
@@ -503,17 +506,17 @@ Sender: ${currentUser?._id || "Missing"}
     }
   }
 
-  useEffect(() => {
-    if (!activeConversation?._id || !currentUser?._id) return;
+  // useEffect(() => {
+  //   if (!activeConversation?._id || !currentUser?._id) return;
 
-    refreshActiveConversation();
+  //   refreshActiveConversation();
 
-    const interval = setInterval(() => {
-      refreshActiveConversation();
-    }, 3000);
+  //   const interval = setInterval(() => {
+  //     refreshActiveConversation();
+  //   }, 3000);
 
-    return () => clearInterval(interval);
-  }, [activeConversation?._id, currentUser?._id]);
+  //   return () => clearInterval(interval);
+  // }, [activeConversation?._id, currentUser?._id]);
 
   useEffect(() => {
     if (!activeConversation?._id || !currentUser?._id) return;
